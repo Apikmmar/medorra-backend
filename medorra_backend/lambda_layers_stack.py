@@ -15,11 +15,4 @@ def create_layers(scope: Construct):
         description="powertools layer"
     )
 
-    generic_layer = lambda_.LayerVersion(
-        scope, "GenericLayer",
-        code=lambda_.Code.from_asset("lambda/Layers/GenericLayer"),
-        compatible_runtimes=[lambda_.Runtime.PYTHON_3_14],
-        description="generic shared utilities layer"
-    )
-
-    return powertools_layer, generic_layer
+    return powertools_layer

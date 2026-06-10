@@ -1,19 +1,16 @@
 from aws_cdk import (
-    # Duration,
-    Stack,
-    # aws_sqs as sqs,
-)
+    Stack,)
 from constructs import Construct
+
+from .dynamo_db_stack import DynamoDBStack
+from .lambda_function_stack import LambdaStack
+from .api_gateway_stack import ApiGatewayStack
 
 class MedorraBackendStack(Stack):
 
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
-        # The code that defines your stack goes here
-
-        # example resource
-        # queue = sqs.Queue(
-        #     self, "MedorraBackendQueue",
-        #     visibility_timeout=Duration.seconds(300),
-        # )
+        dynamo_db_stack = DynamoDBStack(self, "DynamoDBStack")
+        lambda_stack = LambdaStack (self, "LambdaStack", dynamo_db_stack=dynamo_db_stack)
+        api_gateway_stack = ApiGatewayStack(self, "ApiGatewayStack", lambda_stack=lambda_stack)

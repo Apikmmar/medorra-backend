@@ -7,29 +7,55 @@ from constructs import Construct
 class DynamoDBStack(Construct):
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
-        
+
         tableList = [
-            '',
+            'Users',
+            'Symptoms',
+            'Medications',
+            'Food',
+            'Sleep',
+            'Insights',
         ]
-        
+
+        sort_keys = {
+            'Symptoms': 'timestamp#entryId',
+            'Medications': 'timestamp#entryId',
+            'Food': 'timestamp#entryId',
+            'Sleep': 'timestamp#entryId',
+            'Insights': 'confidence#insightId',
+        }
+
+        stream_tables = ['Symptoms', 'Medications', 'Food', 'Sleep']
+
         self.tables = {}
 
         for table in tableList:
-            parts = table.split('_')
-            partition_key = parts[0][0].lower() + parts[0][1:] + ''.join(p.capitalize() for p in parts[1:]) + 'Id'
-            
-            ddb_table = dynamodb.Table(
-                self, table,
-                table_name=table,
-                partition_key=dynamodb.Attribute(name=partition_key, type=dynamodb.AttributeType.STRING),
-                billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
-                stream=dynamodb.StreamViewType.NEW_AND_OLD_IMAGES,
-                removal_policy=RemovalPolicy.DESTROY
-            )
+            partition_key = 'userId'
+
+            table_kwargs = {
+                'table_name': table,
+                'partition_key': dynamodb.Attribute(name=partition_key, type=dynamodb.AttributeType.STRING),
+                'billing_mode': dynamodb.BillingMode.PAY_PER_REQUEST,
+                'encryption': dynamodb.TableEncryption.AWS_MANAGED,
+                'point_in_time_recovery': True,
+                'removal_policy': RemovalPolicy.DESTROY,
+            }
+
+            if table in sort_keys:
+                table_kwargs['sort_key'] = dynamodb.Attribute(
+                    name=sort_keys[table], type=dynamodb.AttributeType.STRING
+                )
+
+            if table in stream_tables:
+                table_kwargs['stream'] = dynamodb.StreamViewType.NEW_AND_OLD_IMAGES
+
+            ddb_table = dynamodb.Table(self, table, **table_kwargs)
             self.tables[table] = ddb_table
-            
-            if table == '':
+
+            if table == 'Insights':
                 ddb_table.add_global_secondary_index(
-                    partition_key=dynamodb.Attribute(name='', type=dynamodb.AttributeType.STRING),
-                    index_name='-'.join(['gsi', ''])
+                    partition_key=dynamodb.Attribute(name='userId', type=dynamodb.AttributeType.STRING),
+                    sort_key=dynamodb.Attribute(name='status#confidence#insightId', type=dynamodb.AttributeType.STRING),
+                    index_name='-'.join(['gsi', 'status', 'confidence']),
+                    projection_type=dynamodb.ProjectionType.ALL,
                 )
