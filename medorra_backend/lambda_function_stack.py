@@ -7,7 +7,7 @@ from .lambda_layers_stack import create_layers
 
 class LambdaStack(Construct):
 
-    def __init__(self, scope: Construct, construct_id: str, dynamo_db_stack, **kwargs) -> None:
+    def __init__(self, scope: Construct, construct_id: str, dynamo_db_stack, prefix: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
         powertools_layer = create_layers(self)
@@ -15,7 +15,7 @@ class LambdaStack(Construct):
 
         self.function_lambda = lambda_.Function(
             self, "FunctionNameLambda",
-            function_name="FunctionName",
+            function_name=f"{prefix}FunctionName",
             runtime=lambda_.Runtime.PYTHON_3_14,
             handler="lambda_function.lambda_handler",
             code=lambda_.Code.from_asset("lambda/Function/FunctionName"),
@@ -29,7 +29,7 @@ class LambdaStack(Construct):
 
         self.function2_lambda = lambda_.Function(
             self, "FunctionName2Lambda",
-            function_name="FunctionName2",
+            function_name=f"{prefix}FunctionName2",
             runtime=lambda_.Runtime.PYTHON_3_14,
             handler="lambda_function.lambda_handler",
             code=lambda_.Code.from_asset("lambda/Function/FunctionName2"),

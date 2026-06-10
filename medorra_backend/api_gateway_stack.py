@@ -12,13 +12,13 @@ CORS_OPTIONS = apigw.CorsOptions(
 
 class ApiGatewayStack(Construct):
 
-    def __init__(self, scope: Construct, construct_id: str, lambda_stack, **kwargs) -> None:
+    def __init__(self, scope: Construct, construct_id: str, lambda_stack, prefix: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
         api = apigw.RestApi(
             self, "MedorraAPI",
             description="API for Medorra Web-App",
-            rest_api_name=f"Medorra-API",
+            rest_api_name=f"{prefix}-API",
             default_cors_preflight_options=CORS_OPTIONS,
         )
 

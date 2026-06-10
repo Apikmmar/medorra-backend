@@ -5,7 +5,7 @@ from aws_cdk import (
 from constructs import Construct
 
 class DynamoDBStack(Construct):
-    def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
+    def __init__(self, scope: Construct, construct_id: str, prefix: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
         tableList = [
@@ -18,10 +18,10 @@ class DynamoDBStack(Construct):
         ]
 
         sort_keys = {
-            'Symptoms': 'timestamp#entryId',
-            'Medications': 'timestamp#entryId',
-            'Food': 'timestamp#entryId',
-            'Sleep': 'timestamp#entryId',
+            'Symptoms': 'createdAt#entryId',
+            'Medications': 'createdAt#entryId',
+            'Food': 'createdAt#entryId',
+            'Sleep': 'createdAt#entryId',
             'Insights': 'confidence#insightId',
         }
 
@@ -33,7 +33,7 @@ class DynamoDBStack(Construct):
             partition_key = 'userId'
 
             table_kwargs = {
-                'table_name': table,
+                'table_name': f"{prefix}{table}",
                 'partition_key': dynamodb.Attribute(name=partition_key, type=dynamodb.AttributeType.STRING),
                 'billing_mode': dynamodb.BillingMode.PAY_PER_REQUEST,
                 'encryption': dynamodb.TableEncryption.AWS_MANAGED,
