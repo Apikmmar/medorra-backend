@@ -18,7 +18,7 @@ def create_layers(scope: Construct):
     medorra_generic_layer = lambda_.LayerVersion(
         scope, "GenericLayer",
         code=lambda_.Code.from_asset("lambda/Layers/MedorraGenericLayer"),
-        compatible_runtimes=[lambda_.Runtime.PYTHON_3_11],
+        compatible_runtimes=[lambda_.Runtime.PYTHON_3_14],
         description="generic shared utilities layer"
     )
 
