@@ -5,10 +5,10 @@ EMAIL_REGEX = re.compile(
     r'^[a-zA-Z0-9.!#$%&\'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$'
 )
 PASSWORD_UPPERCASE = re.compile(r'[A-Z]')
-PASSWORD_LOWECASE = re.compile(r'[a-z]')
+PASSWORD_LOWERCASE = re.compile(r'[a-z]')
 PASSWORD_DIGIT = re.compile(r'[0-9]')
 
-def ValidateRegistration(email, password):
+def validateRegistration(email, password):
     validateEmail(email)
     validatePassword(password)
 
@@ -26,7 +26,7 @@ def validateEmail(email):
 
 def validatePassword(password):
     if not password:
-        raise ValidationError("password", "Password is requored")
+        raise ValidationError("password", "Password is required")
 
     if len(password) < 8:
         raise ValidationError("password", "Password must be at least 8 characters")

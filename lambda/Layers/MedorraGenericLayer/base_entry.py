@@ -13,7 +13,7 @@ class ValidationError(Exception):
 @dataclass
 class BaseEntry:
     userId: str
-    entryType: str
+    entryType: str = ""
     entryId: str = field(default_factory=lambda: str(uuid.uuid4()))
     timestamp: Optional[str] = None
     createdAt: Optional[str] = None
