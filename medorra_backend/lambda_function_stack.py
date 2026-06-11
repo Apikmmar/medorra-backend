@@ -10,7 +10,7 @@ class LambdaStack(Construct):
     def __init__(self, scope: Construct, construct_id: str, dynamo_db_stack, prefix: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
-        powertools_layer = create_layers(self)
+        powertools_layer, medorra_generic_layer = create_layers(self)
         tables = dynamo_db_stack.tables
 
         self.function_lambda = lambda_.Function(

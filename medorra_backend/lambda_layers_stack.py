@@ -15,4 +15,11 @@ def create_layers(scope: Construct):
         description="powertools layer"
     )
 
-    return powertools_layer
+    medorra_generic_layer = lambda_.LayerVersion(
+        scope, "GenericLayer",
+        code=lambda_.Code.from_asset("lambda/Layers/MedorraGenericLayer"),
+        compatible_runtimes=[lambda_.Runtime.PYTHON_3_11],
+        description="generic shared utilities layer"
+    )
+
+    return powertools_layer, medorra_generic_layer
