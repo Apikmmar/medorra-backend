@@ -33,21 +33,17 @@ class ApiGatewayStack(Construct):
             ),
         )
 
-        # TODO: Add Cognito authorizer when protected endpoints (entries/insights) are built (tasks 5, 8)
-        # self.authorizer = apigw.CognitoUserPoolsAuthorizer(
-        #     self,
-        #     "MedorraCognitoAuthorizer",
-        #     cognito_user_pools=[cognito_stack.user_pool],
-        #     authorizer_name=f"{prefix}-CognitoAuthorizer",
-        #     identity_source="method.request.header.Authorization",
-        # )
+        self.authorizer = apigw.CognitoUserPoolsAuthorizer(
+            self,
+            "MedorraCognitoAuthorizer",
+            cognito_user_pools=[cognito_stack.user_pool],
+            authorizer_name=f"{prefix}-CognitoAuthorizer",
+            identity_source="method.request.header.Authorization",
+        )
 
         # --- Public endpoints (no authorization required) ---
-
-        # /auth resource
         auth_resource = self.api.root.add_resource("auth")
 
-        # POST /auth/register
         register_resource = auth_resource.add_resource("register")
         register_resource.add_method(
             "POST",
@@ -55,7 +51,6 @@ class ApiGatewayStack(Construct):
             authorization_type=apigw.AuthorizationType.NONE,
         )
 
-        # POST /auth/login
         login_resource = auth_resource.add_resource("login")
         login_resource.add_method(
             "POST",
@@ -63,12 +58,46 @@ class ApiGatewayStack(Construct):
             authorization_type=apigw.AuthorizationType.NONE,
         )
 
-        # POST /auth/refresh
         refresh_resource = auth_resource.add_resource("refresh")
         refresh_resource.add_method(
             "POST",
             apigw.LambdaIntegration(lambda_stack.refresh_token_lambda),
             authorization_type=apigw.AuthorizationType.NONE,
+        )
+
+        # --- Protected endpoints (Cognito authorization required) ---
+        entries_resource = self.api.root.add_resource("entries")
+
+        symptom_resource = entries_resource.add_resource("symptom")
+        symptom_resource.add_method(
+            "POST",
+            apigw.LambdaIntegration(lambda_stack.create_symptom_entry_lambda),
+            authorization_type=apigw.AuthorizationType.COGNITO,
+            authorizer=self.authorizer,
+        )
+
+        medication_resource = entries_resource.add_resource("medication")
+        medication_resource.add_method(
+            "POST",
+            apigw.LambdaIntegration(lambda_stack.create_medication_entry_lambda),
+            authorization_type=apigw.AuthorizationType.COGNITO,
+            authorizer=self.authorizer,
+        )
+
+        food_resource = entries_resource.add_resource("food")
+        food_resource.add_method(
+            "POST",
+            apigw.LambdaIntegration(lambda_stack.create_food_entry_lambda),
+            authorization_type=apigw.AuthorizationType.COGNITO,
+            authorizer=self.authorizer,
+        )
+
+        sleep_resource = entries_resource.add_resource("sleep")
+        sleep_resource.add_method(
+            "POST",
+            apigw.LambdaIntegration(lambda_stack.create_sleep_entry_lambda),
+            authorization_type=apigw.AuthorizationType.COGNITO,
+            authorizer=self.authorizer,
         )
 
         # --- Output ---

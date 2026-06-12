@@ -57,10 +57,74 @@ class LambdaStack(Construct):
             },
         )
 
+        self.create_symptom_entry_lambda = lambda_.Function(
+            self, "CreateSymptomEntryLambda",
+            function_name=f"{prefix}CreateSymptomEntryn",
+            runtime=lambda_.Runtime.PYTHON_3_14,
+            handler="lambda_function.lambda_handler",
+            code=lambda_.Code.from_asset("lambda/Function/CreateSymptomEntry"),
+            timeout=Duration.seconds(300),
+            memory_size=128,
+            layers=[powertools_layer, medorra_generic_layer],
+            environment={
+                "SYMPTOMS_TABLE_NAME": tables['Symptoms'].table_name
+            },
+        )
+
+        self.create_medication_entry_lambda = lambda_.Function(
+            self, "CreateMedicationEntryLambda",
+            function_name=f"{prefix}CreateMedicationEntry",
+            runtime=lambda_.Runtime.PYTHON_3_14,
+            handler="lambda_function.lambda_handler",
+            code=lambda_.Code.from_asset("lambda/Function/CreateMedicationEntry"),
+            timeout=Duration.seconds(300),
+            memory_size=128,
+            layers=[powertools_layer, medorra_generic_layer],
+            environment={
+                "MEDICATIONS_TABLE_NAME": tables['Medications'].table_name
+            },
+        )
+
+        self.create_food_entry_lambda = lambda_.Function(
+            self, "CreateFoodEntryLambda",
+            function_name=f"{prefix}CreateFoodEntry",
+            runtime=lambda_.Runtime.PYTHON_3_14,
+            handler="lambda_function.lambda_handler",
+            code=lambda_.Code.from_asset("lambda/Function/CreateFoodEntry"),
+            timeout=Duration.seconds(300),
+            memory_size=128,
+            layers=[powertools_layer, medorra_generic_layer],
+            environment={
+                "FOOD_TABLE_NAME": tables['Food'].table_name
+            },
+        )
+
+        self.create_sleep_entry_lambda = lambda_.Function(
+            self, "CreateSleepEntryLambda",
+            function_name=f"{prefix}CreateSleepEntry",
+            runtime=lambda_.Runtime.PYTHON_3_14,
+            handler="lambda_function.lambda_handler",
+            code=lambda_.Code.from_asset("lambda/Function/CreateSleepEntry"),
+            timeout=Duration.seconds(300),
+            memory_size=128,
+            layers=[powertools_layer, medorra_generic_layer],
+            environment={
+                "SLEEP_TABLE_NAME": tables['Sleep'].table_name
+            },
+        )
+
         all_lambdas = [
             self.register_lambda,
             self.login_lambda,
             self.refresh_token_lambda,
+            self.refresh_token_lambda,
+            self.refresh_token_lambda,
+            self.refresh_token_lambda,
+            self.refresh_token_lambda,
+            self.create_symptom_entry_lambda,
+            self.create_medication_entry_lambda,
+            self.create_food_entry_lambda,
+            self.create_sleep_entry_lambda,
         ]
 
         for table in tables.values():
