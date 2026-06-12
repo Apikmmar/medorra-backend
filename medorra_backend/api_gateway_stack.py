@@ -100,5 +100,20 @@ class ApiGatewayStack(Construct):
             authorizer=self.authorizer,
         )
 
+        entries_resource.add_method(
+            "GET",
+            apigw.LambdaIntegration(lambda_stack.list_entries_by_type_lambda),
+            authorization_type=apigw.AuthorizationType.COGNITO,
+            authorizer=self.authorizer,
+        )
+
+        timeline_resource = entries_resource.add_resource("timeline")
+        timeline_resource.add_method(
+            "GET",
+            apigw.LambdaIntegration(lambda_stack.list_all_entries_lambda),
+            authorization_type=apigw.AuthorizationType.COGNITO,
+            authorizer=self.authorizer,
+        )
+
         # --- Output ---
         CfnOutput(self, "ApiUrl", value=self.api.url, description="Medorra API Gateway URL")
