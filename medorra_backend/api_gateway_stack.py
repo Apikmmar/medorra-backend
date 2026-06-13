@@ -115,5 +115,38 @@ class ApiGatewayStack(Construct):
             authorizer=self.authorizer,
         )
 
+        symptom_entry_resource = symptom_resource.add_resource("{entryId}")
+        symptom_entry_resource.add_method(
+            "PUT",
+            apigw.LambdaIntegration(lambda_stack.update_symptom_lambda),
+            authorization_type=apigw.AuthorizationType.COGNITO,
+            authorizer=self.authorizer,
+        )
+
+        medication_entry_resource = medication_resource.add_resource("{entryId}")
+        medication_entry_resource.add_method(
+            "PUT",
+            apigw.LambdaIntegration(lambda_stack.update_medication_lambda),
+            authorization_type=apigw.AuthorizationType.COGNITO,
+            authorizer=self.authorizer,
+        )
+
+        food_entry_resource = food_resource.add_resource("{entryId}")
+        food_entry_resource.add_method(
+            "PUT",
+            apigw.LambdaIntegration(lambda_stack.update_food_lambda),
+            authorization_type=apigw.AuthorizationType.COGNITO,
+            authorizer=self.authorizer,
+        )
+
+        sleep_entry_resource = sleep_resource.add_resource("{entryId}")
+        sleep_entry_resource.add_method(
+            "PUT",
+            apigw.LambdaIntegration(lambda_stack.update_sleep_lambda),
+            authorization_type=apigw.AuthorizationType.COGNITO,
+            authorizer=self.authorizer,
+        )
+
+
         # --- Output ---
         CfnOutput(self, "ApiUrl", value=self.api.url, description="Medorra API Gateway URL")

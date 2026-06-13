@@ -147,6 +147,62 @@ class LambdaStack(Construct):
             },
         )
 
+        self.update_medication_lambda = lambda_.Function(
+            self, "UpdateMedicationEntryLambda",
+            function_name=f"{prefix}UpdateMedicationEntry",
+            runtime=lambda_.Runtime.PYTHON_3_14,
+            handler="lambda_function.lambda_handler",
+            code=lambda_.Code.from_asset("lambda/Function/UpdateMedicationEntry"),
+            timeout=Duration.seconds(300),
+            memory_size=128,
+            layers=[powertools_layer, medorra_generic_layer],
+            environment={
+                "MEDICATIONS_TABLE_NAME": tables['Medications'].table_name,
+            },
+        )
+
+        self.update_food_lambda = lambda_.Function(
+            self, "UpdateFoodEntryLambda",
+            function_name=f"{prefix}UpdateFoodEntry",
+            runtime=lambda_.Runtime.PYTHON_3_14,
+            handler="lambda_function.lambda_handler",
+            code=lambda_.Code.from_asset("lambda/Function/UpdateFoodEntry"),
+            timeout=Duration.seconds(300),
+            memory_size=128,
+            layers=[powertools_layer, medorra_generic_layer],
+            environment={
+                "FOOD_TABLE_NAME": tables['Food'].table_name,
+            },
+        )
+
+        self.update_symptom_lambda = lambda_.Function(
+            self, "UpdateSymptomEntryLambda",
+            function_name=f"{prefix}UpdateSymptomEntry",
+            runtime=lambda_.Runtime.PYTHON_3_14,
+            handler="lambda_function.lambda_handler",
+            code=lambda_.Code.from_asset("lambda/Function/UpdateSymptomEntry"),
+            timeout=Duration.seconds(300),
+            memory_size=128,
+            layers=[powertools_layer, medorra_generic_layer],
+            environment={
+                "SYMPTOMS_TABLE_NAME": tables['Symptoms'].table_name,
+            },
+        )
+
+        self.update_sleep_lambda = lambda_.Function(
+            self, "UpdateSleepEntryLambda",
+            function_name=f"{prefix}UpdateSleepEntry",
+            runtime=lambda_.Runtime.PYTHON_3_14,
+            handler="lambda_function.lambda_handler",
+            code=lambda_.Code.from_asset("lambda/Function/UpdateSleepEntry"),
+            timeout=Duration.seconds(300),
+            memory_size=128,
+            layers=[powertools_layer, medorra_generic_layer],
+            environment={
+                "SLEEP_TABLE_NAME": tables['Sleep'].table_name,
+            },
+        )
+
         all_lambdas = [
             self.register_lambda,
             self.login_lambda,
@@ -161,6 +217,10 @@ class LambdaStack(Construct):
             self.create_sleep_entry_lambda,
             self.list_entries_by_type_lambda,
             self.list_all_entries_lambda,
+            self.update_symptom_lambda,
+            self.update_medication_lambda,
+            self.update_food_lambda,
+            self.update_sleep_lambda,
         ]
 
         for table in tables.values():
