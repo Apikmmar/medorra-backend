@@ -203,6 +203,62 @@ class LambdaStack(Construct):
             },
         )
 
+        self.delete_medication_lambda = lambda_.Function(
+            self, "DeleteMedicationEntryLambda",
+            function_name=f"{prefix}DeleteMedicationEntry",
+            runtime=lambda_.Runtime.PYTHON_3_14,
+            handler="lambda_function.lambda_handler",
+            code=lambda_.Code.from_asset("lambda/Function/DeleteMedicationEntry"),
+            timeout=Duration.seconds(300),
+            memory_size=128,
+            layers=[powertools_layer, medorra_generic_layer],
+            environment={
+                "MEDICATIONS_TABLE_NAME": tables['Medications'].table_name,
+            },
+        )
+
+        self.delete_food_lambda = lambda_.Function(
+            self, "DeleteFoodEntryLambda",
+            function_name=f"{prefix}DeleteFoodEntry",
+            runtime=lambda_.Runtime.PYTHON_3_14,
+            handler="lambda_function.lambda_handler",
+            code=lambda_.Code.from_asset("lambda/Function/DeleteFoodEntry"),
+            timeout=Duration.seconds(300),
+            memory_size=128,
+            layers=[powertools_layer, medorra_generic_layer],
+            environment={
+                "FOOD_TABLE_NAME": tables['Food'].table_name,
+            },
+        )
+
+        self.delete_symptom_lambda = lambda_.Function(
+            self, "DeleteSymptomEntryLambda",
+            function_name=f"{prefix}DeleteSymptomEntry",
+            runtime=lambda_.Runtime.PYTHON_3_14,
+            handler="lambda_function.lambda_handler",
+            code=lambda_.Code.from_asset("lambda/Function/DeleteSymptomEntry"),
+            timeout=Duration.seconds(300),
+            memory_size=128,
+            layers=[powertools_layer, medorra_generic_layer],
+            environment={
+                "SYMPTOMS_TABLE_NAME": tables['Symptoms'].table_name,
+            },
+        )
+
+        self.delete_sleep_lambda = lambda_.Function(
+            self, "DeleteSleepEntryLambda",
+            function_name=f"{prefix}DeleteSleepEntry",
+            runtime=lambda_.Runtime.PYTHON_3_14,
+            handler="lambda_function.lambda_handler",
+            code=lambda_.Code.from_asset("lambda/Function/DeleteSleepEntry"),
+            timeout=Duration.seconds(300),
+            memory_size=128,
+            layers=[powertools_layer, medorra_generic_layer],
+            environment={
+                "SLEEP_TABLE_NAME": tables['Sleep'].table_name,
+            },
+        )
+
         all_lambdas = [
             self.register_lambda,
             self.login_lambda,
@@ -221,6 +277,10 @@ class LambdaStack(Construct):
             self.update_medication_lambda,
             self.update_food_lambda,
             self.update_sleep_lambda,
+            self.delete_symptom_lambda,
+            self.delete_medication_lambda,
+            self.delete_food_lambda,
+            self.delete_sleep_lambda,
         ]
 
         for table in tables.values():
