@@ -4,6 +4,7 @@ import boto3
 from botocore.exceptions import ClientError
 from symptom_entry import SymptomEntry
 from base_entry import BaseEntry, ValidationError
+from dynamo_retry import dynamoRetry
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.utilities.typing import LambdaContext
 
@@ -28,12 +29,12 @@ def lambda_handler(event, context: LambdaContext):
         entry = SymptomEntry.fromDict(body)
         entry.validate()
 
-        sortKey = BaseEntry.generateSortKey(entry.createdAt, entryentryId)
+        sortKey = BaseEntry.generateSortKey(entry.createdAt, entry.entryId)
 
         item = entry.toDict()
         item["createdAt#entryId"] = sortKey
 
-        SYMPTOM_TABLE.put_item(Item=item)
+        dynamoRetry(SYMPTOM_TABLE.put_item, Item=item)
         
         return createResponse(200, "Symptom entry created successfully", item)
 

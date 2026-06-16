@@ -4,6 +4,7 @@ import boto3
 from botocore.exceptions import ClientError
 from sleep_entry import SleepEntry
 from base_entry import BaseEntry, ValidationError
+from dynamo_retry import dynamoRetry
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.utilities.typing import LambdaContext
 
@@ -33,9 +34,9 @@ def lambda_handler(event, context: LambdaContext):
         item = entry.toDict()
         item["createdAt#entryId"] = sortKey
 
-        SLEEP_TABLE.put_item(Item=item)
+        dynamoRetry(SLEEP_TABLE.put_item, Item=item)
 
-        return createResponse(200, "Sleep entry Successfully created", item)
+        return createResponse(200, "Sleep entry created successfully", item)
 
     except ValidationError as e:
         return createResponse(400, e.message, {"field": e.field_name})
@@ -44,7 +45,6 @@ def lambda_handler(event, context: LambdaContext):
         logger.exception({"message": str(e)})
         return createResponse(503, "Service temporarily unavailable, please retry", None)
 
-        
     except Exception as e:
         tracer.put_annotation("lambda_error", "true")
         tracer.put_annotation("lambda_name", context.function_name)

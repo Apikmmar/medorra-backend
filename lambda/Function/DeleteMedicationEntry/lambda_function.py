@@ -3,6 +3,7 @@ import json
 import boto3
 from boto3.dynamodb.conditions import Key
 from botocore.exceptions import ClientError
+from dynamo_retry import dynamoRetry
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.utilities.typing import LambdaContext
 
@@ -28,19 +29,20 @@ def lambda_handler(event, context: LambdaContext):
         existing = findEntry(userId, entryId)
 
         if not existing:
-            return createResponse(400, "Entry not found", None)
+            return createResponse(404, "Entry not found", None)
 
         sortKey = existing["createdAt#entryId"]
 
-        MEDICATIONS_TABLE.delete_item(
+        dynamoRetry(
+            MEDICATIONS_TABLE.delete_item,
             Key={
                 "userId": userId,
                 "createdAt#entryId": sortKey,
             },
-            ConditionExpression="attribite_exists(userId)",
+            ConditionExpression="attribute_exists(userId)",
         )
 
-        return createResponse(200, "Delete medication entry successful.", {"email": email,})
+        return createResponse(200, "Medication entry deleted successfully", None)
 
     except ClientError as e:
         errorCode = e.response.get("Error", {}).get("Code", "")
@@ -59,6 +61,17 @@ def lambda_handler(event, context: LambdaContext):
         return createResponse(500, "The server encountered an unexpected condition that prevented it from fulfilling your request.", None)
 
 @tracer.capture_method
+def findEntry(userId, entryId):
+    response = dynamoRetry(
+        MEDICATIONS_TABLE.query,
+        KeyConditionExpression=Key("userId").eq(userId),
+        FilterExpression="entryId = :eid",
+        ExpressionAttributeValues={":eid": entryId},
+    )
+    items = response.get("Items", [])
+    return items[0] if items else None
+
+@tracer.capture_method
 def createResponse(statusCode, message, data):
     return {
         'statusCode': statusCode,
@@ -69,13 +82,3 @@ def createResponse(statusCode, message, data):
         }),
         'headers': {"Access-Control-Allow-Origin": "*"}
     }
-
-@tracer.capture_method
-def findEntry(userId, entryId):
-    response = MEDICATIONS_TABLE.query(
-        KeyConditionExpression=Key("userId").eq(userId),
-        FilterExpression="entryId = : eid",
-        ExpressionAttributeValues={":eid": entryId},
-    ).get("Items", [])
-
-    return items[0] if items else None

@@ -4,6 +4,7 @@ import boto3
 from botocore.exceptions import ClientError
 from food_entry import FoodEntry
 from base_entry import BaseEntry, ValidationError
+from dynamo_retry import dynamoRetry
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.utilities.typing import LambdaContext
 
@@ -33,7 +34,7 @@ def lambda_handler(event, context: LambdaContext):
         item = entry.toDict()
         item["createdAt#entryId"] = sortKey
 
-        FOOD_TABLE.put_item(Item=item)
+        dynamoRetry(FOOD_TABLE.put_item, Item=item)
 
         return createResponse(200, "Food entry created successfully", item)
 

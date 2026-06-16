@@ -5,6 +5,7 @@ from boto3.dynamodb.conditions import Key
 from botocore.exceptions import ClientError
 from sleep_entry import SleepEntry
 from base_entry import BaseEntry, ValidationError
+from dynamo_retry import dynamoRetry
 from datetime import datetime
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.utilities.typing import LambdaContext
@@ -28,20 +29,22 @@ def lambda_handler(event, context: LambdaContext):
         if not entryId:
             return createResponse(400, "entryId is required", {"field": "entryId"})
 
+        body = json.loads(event.get("body", "{}"))
+
         existing = findEntry(userId, entryId)
 
         if not existing:
             return createResponse(404, "Entry not found", None)
 
         body["userId"] = userId
-        body["entryId"] = entryId
-        body["createAt"] = createAt
+        body["entryId"] = existing["entryId"]
+        body["createdAt"] = existing["createdAt"]
         body["timestamp"] = body.get("timestamp", existing.get("timestamp"))
 
         entry = SleepEntry.fromDict(body)
         entry.validate()
 
-        currentVersion = existing.get("version")
+        currentVersion = existing.get("version", 1)
         now = datetime.now().strftime('%Y-%m-%dT%H:%M:%S.%fZ')
 
         sortKey = existing["createdAt#entryId"]
@@ -51,7 +54,8 @@ def lambda_handler(event, context: LambdaContext):
         item["updatedAt"] = now
         item["version"] = currentVersion + 1
 
-        SLEEP_TABLE.put_item(
+        dynamoRetry(
+            SLEEP_TABLE.put_item,
             Item=item,
             ConditionExpression="attribute_exists(userId) AND version = :expectedVersion",
             ExpressionAttributeValues={
@@ -60,6 +64,9 @@ def lambda_handler(event, context: LambdaContext):
         )
 
         return createResponse(200, "Sleep entry updated successfully", item)
+
+    except ValidationError as e:
+        return createResponse(400, e.message, {"field": e.field_name})
 
     except ClientError as e:
         errorCode = e.response.get("Error", {}).get("Code", "")
@@ -78,6 +85,17 @@ def lambda_handler(event, context: LambdaContext):
         return createResponse(500, "The server encountered an unexpected condition that prevented it from fulfilling your request.", None)
 
 @tracer.capture_method
+def findEntry(userId, entryId):
+    response = dynamoRetry(
+        SLEEP_TABLE.query,
+        KeyConditionExpression=Key("userId").eq(userId),
+        FilterExpression="entryId = :eid",
+        ExpressionAttributeValues={":eid": entryId},
+    )
+    items = response.get("Items", [])
+    return items[0] if items else None
+
+@tracer.capture_method
 def createResponse(statusCode, message, data):
     return {
         'statusCode': statusCode,
@@ -88,14 +106,3 @@ def createResponse(statusCode, message, data):
         }),
         'headers': {"Access-Control-Allow-Origin": "*"}
     }
-
-@tracer.capture_method
-def findEntry(user, entryId):
-    response = table.query(
-        KeyConditionExpression=Key("userId").eq(userId),
-        FilterExpression="entryId = :eid",
-        ExpressionAttributeValues={":eid": entryId},
-    )
-    items = response.get("Items", [])
-    
-    return items[0] if items else None

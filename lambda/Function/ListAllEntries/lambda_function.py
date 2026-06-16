@@ -3,7 +3,8 @@ import json
 import boto3
 from boto3.dynamodb.conditions import Key
 from botocore.exceptions import ClientError
-from base_entry import ValidationError
+from concurrent.futures import ThreadPoolExecutor
+from dynamo_retry import dynamoRetry
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.utilities.typing import LambdaContext
 
@@ -14,11 +15,11 @@ SLEEP_TABLE_NAME = os.environ.get("SLEEP_TABLE_NAME")
 
 dynamodb = boto3.resource("dynamodb")
 
-TABLE_MAP = {
-    "symptoms": SYMPTOMS_TABLE,
-    "medications": MEDICATIONS_TABLE,
-    "food": FOOD_TABLE,
-    "sleep": SLEEP_TABLE
+TABLE_NAMES = {
+    "symptom": SYMPTOMS_TABLE_NAME,
+    "medication": MEDICATIONS_TABLE_NAME,
+    "food": FOOD_TABLE_NAME,
+    "sleep": SLEEP_TABLE_NAME,
 }
 
 logger = Logger()
@@ -43,8 +44,8 @@ def lambda_handler(event, context: LambdaContext):
         totalCount = 0
 
         with ThreadPoolExecutor(max_workers=4) as executor:
-            future = {}
-            for entryType, tableName in TABLE_MAP.items():
+            futures = {}
+            for entryType, tableName in TABLE_NAMES.items():
                 futures[entryType] = executor.submit(
                     queryTable, tableName, userId, startDate, endDate, entryType
                 )
@@ -70,9 +71,6 @@ def lambda_handler(event, context: LambdaContext):
 
         return createResponse(200, "Entries retrieved successfully", data)
 
-    except ValidationError as e:
-        return createResponse(400, e.message, {"field": e.field_name})
-
     except ClientError as e:
         logger.exception({"message": str(e)})
         return createResponse(503, "Service temporarily unavailable, please retry", None)
@@ -84,18 +82,6 @@ def lambda_handler(event, context: LambdaContext):
         tracer.put_metadata("message", str(e))
         logger.exception({"message": str(e)})
         return createResponse(500, "The server encountered an unexpected condition that prevented it from fulfilling your request.", None)
-
-@tracer.capture_method
-def createResponse(statusCode, message, data):
-    return {
-        'statusCode': statusCode,
-        'body': json.dumps({
-            'status': True if statusCode == 200 else False,
-            'message': message,
-            'data': data
-        }),
-        'headers': {"Access-Control-Allow-Origin": "*"}
-    }
 
 @tracer.capture_method
 def queryTable(tableName, userId, startDate, endDate, entryType):
@@ -121,7 +107,7 @@ def queryTable(tableName, userId, startDate, endDate, entryType):
         if lastKey:
             queryKwargs["ExclusiveStartKey"] = lastKey
 
-        response = table.query(**queryKwargs)
+        response = dynamoRetry(table.query, **queryKwargs)
 
         for item in response.get("Items", []):
             item["entryType"] = entryType
@@ -132,3 +118,15 @@ def queryTable(tableName, userId, startDate, endDate, entryType):
             break
 
     return {"items": items, "count": len(items)}
+
+@tracer.capture_method
+def createResponse(statusCode, message, data):
+    return {
+        'statusCode': statusCode,
+        'body': json.dumps({
+            'status': True if statusCode == 200 else False,
+            'message': message,
+            'data': data
+        }),
+        'headers': {"Access-Control-Allow-Origin": "*"}
+    }
