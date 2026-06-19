@@ -174,6 +174,25 @@ class ApiGatewayStack(Construct):
             authorizer=self.authorizer,
         )
 
+        analysis_resource = self.api.root.add_resource("analysis")
+
+        threshold_resource = analysis_resource.add_resource("threshold")
+        threshold_resource.add_method(
+            "GET",
+            apigw.LambdaIntegration(lambda_stack.check_logging_threshold_lambda),
+            authorization_type=apigw.AuthorizationType.COGNITO,
+            authorizer=self.authorizer,
+        )
+
+        settings_resource = self.api.root.add_resource("settings")
+
+        time_window_resource = settings_resource.add_resource("time-window")
+        time_window_resource.add_method(
+            "PUT",
+            apigw.LambdaIntegration(lambda_stack.update_time_window_lambda),
+            authorization_type=apigw.AuthorizationType.COGNITO,
+            authorizer=self.authorizer,
+        )
 
         # --- Output ---
         CfnOutput(self, "ApiUrl", value=self.api.url, description="Medorra API Gateway URL")

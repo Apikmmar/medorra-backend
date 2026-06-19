@@ -258,6 +258,34 @@ class LambdaStack(Construct):
                 "SLEEP_TABLE_NAME": tables['Sleep'].table_name,
             },
         )
+        
+        self.check_logging_threshold_lambda = lambda_.Function(
+            self, "CheckLoggingThresholdLambda",
+            function_name=f"{prefix}CheckLoggingThreshold",
+            runtime=lambda_.Runtime.PYTHON_3_14,
+            handler="lambda_function.lambda_handler",
+            code=lambda_.Code.from_asset("lambda/Function/CheckLoggingThreshold"),
+            timeout=Duration.seconds(300),
+            memory_size=128,
+            layers=[powertools_layer, medorra_generic_layer],
+            environment={
+                "USERS_TABLE_NAME": tables['Users'].table_name,
+            },
+        )
+
+        self.update_time_window_lambda = lambda_.Function(
+            self, "UpdateTimeWindowLambda",
+            function_name=f"{prefix}UpdateTimeWindow",
+            runtime=lambda_.Runtime.PYTHON_3_14,
+            handler="lambda_function.lambda_handler",
+            code=lambda_.Code.from_asset("lambda/Function/UpdateTimeWindow"),
+            timeout=Duration.seconds(300),
+            memory_size=128,
+            layers=[powertools_layer, medorra_generic_layer],
+            environment={
+                "USERS_TABLE_NAME": tables['Users'].table_name,
+            },
+        )
 
         all_lambdas = [
             self.register_lambda,
@@ -281,6 +309,8 @@ class LambdaStack(Construct):
             self.delete_medication_lambda,
             self.delete_food_lambda,
             self.delete_sleep_lambda,
+            self.check_logging_threshold_lambda,
+            self.update_time_window_lambda,
         ]
 
         for table in tables.values():
