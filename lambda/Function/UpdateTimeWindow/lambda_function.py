@@ -26,7 +26,7 @@ def lambda_handler(event, context: LambdaContext):
 
         body = json.loads(event.get("body", "{}"))
 
-        timeWindow = body.get("timeWimdow", DEFAULT_TIME_WINDOW)
+        timeWindow = body.get("timeWindow", DEFAULT_TIME_WINDOW)
 
         if not isinstance(timeWindow, int) or timeWindow < MIN_TIME_WINDOW or timeWindow > MAX_TIME_WINDOW:
             return createResponse(400, f"timeWindow must be an integer between {MIN_TIME_WINDOW} and {MAX_TIME_WINDOW}", {"field": "timeWindow"})

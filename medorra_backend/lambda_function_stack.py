@@ -1,6 +1,7 @@
 from aws_cdk import (
     Duration,
     aws_lambda as lambda_,
+    aws_iam as iam,
 )
 from constructs import Construct
 from .lambda_layers_stack import create_layers
@@ -59,7 +60,7 @@ class LambdaStack(Construct):
 
         self.create_symptom_entry_lambda = lambda_.Function(
             self, "CreateSymptomEntryLambda",
-            function_name=f"{prefix}CreateSymptomEntryn",
+            function_name=f"{prefix}CreateSymptomEntry",
             runtime=lambda_.Runtime.PYTHON_3_14,
             handler="lambda_function.lambda_handler",
             code=lambda_.Code.from_asset("lambda/Function/CreateSymptomEntry"),
@@ -287,13 +288,36 @@ class LambdaStack(Construct):
             },
         )
 
+        self.pattern_analysis_lambda = lambda_.Function(
+            self, "PatternAnalysisLambda",
+            function_name=f"{prefix}PatternAnalysis",
+            runtime=lambda_.Runtime.PYTHON_3_14,
+            handler="lambda_function.lambda_handler",
+            code=lambda_.Code.from_asset("lambda/Function/PatternAnalysis"),
+            timeout=Duration.seconds(300),
+            memory_size=128,
+            layers=[powertools_layer, medorra_generic_layer],
+            environment={
+                "USERS_TABLE_NAME": tables['Users'].table_name,
+                "SYMPTOMS_TABLE_NAME": tables['Symptoms'].table_name,
+                "MEDICATIONS_TABLE_NAME": tables['Medications'].table_name,
+                "SLEEP_TABLE_NAME": tables['Sleep'].table_name,
+                "FOOD_TABLE_NAME": tables['Food'].table_name,
+                "INSIGHTS_TABLE_NAME": tables['Insights'].table_name,
+                "BEDROCK_MODEL_ID": 'anthropic.claude-3-haiku-20240307-v1:0'
+            },
+        )
+
+        self.pattern_analysis_lambda.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["bedrock:InvokeModel"],
+                resources=["*"]
+            )
+        )
+
         all_lambdas = [
             self.register_lambda,
             self.login_lambda,
-            self.refresh_token_lambda,
-            self.refresh_token_lambda,
-            self.refresh_token_lambda,
-            self.refresh_token_lambda,
             self.refresh_token_lambda,
             self.create_symptom_entry_lambda,
             self.create_medication_entry_lambda,
@@ -311,6 +335,7 @@ class LambdaStack(Construct):
             self.delete_sleep_lambda,
             self.check_logging_threshold_lambda,
             self.update_time_window_lambda,
+            self.pattern_analysis_lambda
         ]
 
         for table in tables.values():
