@@ -44,10 +44,6 @@ def lambda_handler(event, context: LambdaContext):
         
         return createResponse(200, "Time window updated successfully", data)
 
-    except ClientError as e:
-        logger.exception({"message": str(e)})
-        return createResponse(503, "Service temporarily unavailable, please retry", None)
-
     except Exception as e:
         tracer.put_annotation("lambda_error", "true")
         tracer.put_annotation("lambda_name", context.function_name)

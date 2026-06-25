@@ -7,10 +7,11 @@ from dynamo_retry import dynamoRetry
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.utilities.typing import LambdaContext
 
+INSIGHTS_TABLE_NAME = os.environ.get("INSIGHTS_TABLE_NAME")
+
 dynamodb = boto3.resource("dynamodb")
 
-SLEEP_TABLE_NAME = os.environ.get("SLEEP_TABLE_NAME")
-SLEEP_TABLE = dynamodb.Table(SLEEP_TABLE_NAME)
+INSIGHTS_TABLE = dynamodb.Table(INSIGHTS_TABLE_NAME)
 
 logger = Logger()
 tracer = Tracer()
@@ -20,28 +21,19 @@ def lambda_handler(event, context: LambdaContext):
     try:
         userId = event["requestContext"]["authorizer"]["claims"]["sub"]
 
-        pathParams = event.get("pathParameters") or {}
-        entryId = pathParams.get("entryId")
+        allInsights = getInsights(userId)
 
-        if not entryId:
-            return createResponse(400, "entryId is required", {"field": "entryId"})
+        activeInsights = [i for i in allInsights if i.get("status") != "dismissed"]
 
-        existing = findEntry(userId, entryId)
+        if not activeInsights:
+            return createResponse(200, "No patterns detected yet", {"insights": [], "totalCount": 0})
 
-        if not existing:
-            return createResponse(404, "Entry not found", None)
+        data = {
+            "insights": activeInsights,
+            "totalCount": len(activeInsights),
+        }
 
-        sortKey = existing["createdAt#entryId"]
-
-        dynamoRetry(
-            SLEEP_TABLE.delete_item,
-            Key={
-                "userId": userId,
-                "createdAt#entryId": sortKey,
-            },
-        )
-
-        return createResponse(200, "Sleep entry deleted successfully", None)
+        return createResponse(200, "Insights retrieved successfully", data)
 
     except Exception as e:
         tracer.put_annotation("lambda_error", "true")
@@ -52,15 +44,13 @@ def lambda_handler(event, context: LambdaContext):
         return createResponse(500, "The server encountered an unexpected condition that prevented it from fulfilling your request.", None)
 
 @tracer.capture_method
-def findEntry(userId, entryId):
+def getInsights(userId):
     response = dynamoRetry(
-        SLEEP_TABLE.query,
+        INSIGHTS_TABLE.query,
         KeyConditionExpression=Key("userId").eq(userId),
-        FilterExpression="entryId = :eid",
-        ExpressionAttributeValues={":eid": entryId},
+        ScanIndexForward=False,
     )
-    items = response.get("Items", [])
-    return items[0] if items else None
+    return response.get("Items", [])
 
 @tracer.capture_method
 def createResponse(statusCode, message, data):

@@ -41,10 +41,6 @@ def lambda_handler(event, context: LambdaContext):
     except ValidationError as e:
         return createResponse(400, e.message, {"field": e.field_name})
 
-    except ClientError as e:
-        logger.exception({"message": str(e)})
-        return createResponse(503, "Service temporarily unavailable, please retry", None)
-        
     except Exception as e:
         tracer.put_annotation("lambda_error", "true")
         tracer.put_annotation("lambda_name", context.function_name)

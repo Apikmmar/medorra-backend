@@ -149,6 +149,7 @@ class ApiGatewayStack(Construct):
 
         symptom_entry_resource.add_method(
             "DELETE",
+            apigw.LambdaIntegration(lambda_stack.delete_symptom_lambda),
             authorization_type=apigw.AuthorizationType.COGNITO,
             authorizer=self.authorizer,
         )
@@ -193,6 +194,25 @@ class ApiGatewayStack(Construct):
             authorization_type=apigw.AuthorizationType.COGNITO,
             authorizer=self.authorizer,
         )
+
+        insights_resource = self.api.root.add_resource("insights")
+
+        insights_resource.add_method(
+            "GET",
+            apigw.LambdaIntegration(lambda_stack.list_insights_lambda),
+            authorization_type=apigw.AuthorizationType.COGNITO,
+            authorizer=self.authorizer,
+        )
+
+        insight_id_resource = insights_resource.add_resource("{insightId}")
+        respond_resource = insight_id_resource.add_resource("respond")
+        respond_resource.add_method(
+            "POST",
+            apigw.LambdaIntegration(lambda_stack.respond_insight_lambda),
+            authorization_type=apigw.AuthorizationType.COGNITO,
+            authorizer=self.authorizer,
+        )
+
 
         # --- Output ---
         CfnOutput(self, "ApiUrl", value=self.api.url, description="Medorra API Gateway URL")

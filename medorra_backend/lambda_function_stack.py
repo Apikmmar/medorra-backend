@@ -315,6 +315,53 @@ class LambdaStack(Construct):
             )
         )
 
+        self.stream_processor_lambda = lambda_.Function(
+            self, "StreamProcessorLambda",
+            function_name=f"{prefix}StreamProcessor",
+            runtime=lambda_.Runtime.PYTHON_3_14,
+            handler="lambda_function.lambda_handler",
+            code=lambda_.Code.from_asset("lambda/Function/StreamProcessor"),
+            timeout=Duration.seconds(60),
+            memory_size=128,
+            layers=[powertools_layer, medorra_generic_layer],
+            environment={
+                "USERS_TABLE_NAME": tables["Users"].table_name,
+                "EVENT_BUS_NAME": f"{prefix}-EntryEventBus",
+            },
+        )
+
+        self.list_insights_lambda = lambda_.Function(
+            self, "ListInsightsLambda",
+            function_name=f"{prefix}ListInsights",
+            runtime=lambda_.Runtime.PYTHON_3_14,
+            handler="lambda_function.lambda_handler",
+            code=lambda_.Code.from_asset("lambda/Function/ListInsights"),
+            timeout=Duration.seconds(300),
+            memory_size=256,
+            layers=[powertools_layer, medorra_generic_layer],
+            environment={
+                "INSIGHTS_TABLE_NAME": tables["Insights"].table_name,
+                "SYMPTOMS_TABLE_NAME": tables["Symptoms"].table_name,
+                "MEDICATIONS_TABLE_NAME": tables["Medications"].table_name,
+                "FOOD_TABLE_NAME": tables["Food"].table_name,
+                "SLEEP_TABLE_NAME": tables["Sleep"].table_name,
+            },
+        )
+
+        self.respond_insight_lambda = lambda_.Function(
+            self, "RespondInsightLambda",
+            function_name=f"{prefix}RespondInsight",
+            runtime=lambda_.Runtime.PYTHON_3_14,
+            handler="lambda_function.lambda_handler",
+            code=lambda_.Code.from_asset("lambda/Function/ResponseInsights"),
+            timeout=Duration.seconds(300),
+            memory_size=128,
+            layers=[powertools_layer, medorra_generic_layer],
+            environment={
+                "INSIGHTS_TABLE_NAME": tables["Insights"].table_name,
+            },
+        )
+
         all_lambdas = [
             self.register_lambda,
             self.login_lambda,
@@ -335,7 +382,10 @@ class LambdaStack(Construct):
             self.delete_sleep_lambda,
             self.check_logging_threshold_lambda,
             self.update_time_window_lambda,
-            self.pattern_analysis_lambda
+            self.pattern_analysis_lambda,
+            self.stream_processor_lambda,
+            self.list_insights_lambda,
+            self.respond_insight_lambda,
         ]
 
         for table in tables.values():
