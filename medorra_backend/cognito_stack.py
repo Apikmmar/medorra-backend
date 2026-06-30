@@ -20,6 +20,12 @@ class CognitoStack(Construct):
             self_sign_up_enabled=True,
             # Email verification
             auto_verify=cognito.AutoVerifiedAttrs(email=True),
+            # Verification email configuration
+            user_verification=cognito.UserVerificationConfig(
+                email_subject="Medorra - Verify your email address",
+                email_body="Welcome to Medorra! Your verification code is {####}",
+                email_style=cognito.VerificationEmailStyle.CODE,
+            ),
             # Password policy: min 8 chars, require uppercase, lowercase, digits
             # Note: CDK does not expose a max password length setting directly.
             # AWS Cognito enforces a max of 256 chars by default; application-level
