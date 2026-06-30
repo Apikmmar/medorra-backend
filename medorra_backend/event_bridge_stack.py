@@ -42,3 +42,19 @@ class EventBridgeStack(Construct):
             ),
             targets=[targets.LambdaFunction(lambda_stack.pattern_analysis_lambda)],
         )
+
+        self.delete_rule = events.Rule(
+            self,
+            "AccountDeletionRule",
+            rule_name=f"{prefix}-AccountDeletionTrigger",
+            event_bus=self.event_bus,
+            event_pattern=events.EventPattern(
+                source=["medorra.account"],
+                detail_type=["AccountDeletionRequested"],
+            ),
+            targets=[
+                targets.LambdaFunction(lambda_stack.process_account_deletion_lambda)
+            ],
+        )
+
+        self.event_bus.grant_put_events_to(lambda_stack.request_account_deletion_lambda)

@@ -7,6 +7,7 @@ from botocore.exceptions import ClientError
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 from dynamo_retry import dynamoRetry
+from user_isolation import enforceUserIsolation
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from prompt import promptBuilder
@@ -115,6 +116,8 @@ def fetchAllEntries(userId, timeWindow):
     cutoffDate = (datetime.utcnow() - timedelta(days=timeWindow)).strftime('%Y-%m-%dT%H:%M:%S')
 
     allEntries = {}
+
+    items = enforceUserIsolation(userId, items)
 
     with ThreadPoolExecutor(max_workers=4) as executor:
         futures = {}

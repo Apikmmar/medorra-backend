@@ -213,6 +213,13 @@ class ApiGatewayStack(Construct):
             authorizer=self.authorizer,
         )
 
+        account_resource = auth_resource.add_resource("account")
+        account_resource.add_method(
+            "DELETE",
+            apigw.LambdaIntegration(lambda_stack.request_account_deletion_lambda),
+            authorization_type=apigw.AuthorizationType.COGNITO,
+            authorizer=self.authorizer,
+        )
 
         # --- Output ---
         CfnOutput(self, "ApiUrl", value=self.api.url, description="Medorra API Gateway URL")

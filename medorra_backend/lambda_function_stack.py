@@ -362,6 +362,48 @@ class LambdaStack(Construct):
             },
         )
 
+        self.request_account_deletion_lambda = lambda_.Function(
+            self, "RequestAccountDeletionLambda",
+            function_name=f"{prefix}RequestAccountDeletion",
+            runtime=lambda_.Runtime.PYTHON_3_14,
+            handler="lambda_function.lambda_handler",
+            code=lambda_.Code.from_asset("lambda/Function/RequestAccountDeletion"),
+            timeout=Duration.seconds(5),
+            memory_size=128,
+            layers=[powertools_layer, medorra_generic_layer],
+            environment={
+                "USERS_TABLE_NAME": tables["Users"].table_name,
+                "EVENT_BUS_NAME": f"{prefix}-EntryEventBus",
+            },
+        )
+
+        self.process_account_deletion_lambda = lambda_.Function(
+            self, "ProcessAccountDeletionLambda",
+            function_name=f"{prefix}ProcessAccountDeletion",
+            runtime=lambda_.Runtime.PYTHON_3_14,
+            handler="lambda_function.lambda_handler",
+            code=lambda_.Code.from_asset("lambda/Function/ProcessAccountDeletion"),
+            timeout=Duration.seconds(300),
+            memory_size=256,
+            layers=[powertools_layer, medorra_generic_layer],
+            environment={
+                "USERS_TABLE_NAME": tables["Users"].table_name,
+                "SYMPTOMS_TABLE_NAME": tables["Symptoms"].table_name,
+                "MEDICATIONS_TABLE_NAME": tables["Medications"].table_name,
+                "FOOD_TABLE_NAME": tables["Food"].table_name,
+                "SLEEP_TABLE_NAME": tables["Sleep"].table_name,
+                "INSIGHTS_TABLE_NAME": tables["Insights"].table_name,
+                "SENDER_EMAIL": "noreply@medorra.com",
+            },
+        )
+
+        self.process_account_deletion_lambda.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["ses:SendEmail"],
+                resources=["*"],
+            )
+        )
+
         all_lambdas = [
             self.register_lambda,
             self.login_lambda,
@@ -386,6 +428,8 @@ class LambdaStack(Construct):
             self.stream_processor_lambda,
             self.list_insights_lambda,
             self.respond_insight_lambda,
+            self.request_account_deletion_lambda,
+            self.process_account_deletion_lambda,
         ]
 
         for table in tables.values():
