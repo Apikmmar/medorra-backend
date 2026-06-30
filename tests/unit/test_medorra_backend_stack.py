@@ -3,13 +3,11 @@ import aws_cdk.assertions as assertions
 
 from medorra_backend.medorra_backend_stack import MedorraBackendStack
 
-# example tests. To run these tests, uncomment this file along with the example
-# resource in medorra_backend/medorra_backend_stack.py
-def test_sqs_queue_created():
+# Smoke test: ensure the stack synthesizes without errors
+def test_stack_synthesizes():
     app = core.App()
-    stack = MedorraBackendStack(app, "medorra-backend")
+    stack = MedorraBackendStack(app, "medorra-backend", prefix="Medorra")
     template = assertions.Template.from_stack(stack)
 
-#     template.has_resource_properties("AWS::SQS::Queue", {
-#         "VisibilityTimeout": 300
-#     })
+    # Verify DynamoDB tables are created (6 tables expected)
+    template.resource_count_is("AWS::DynamoDB::Table", 6)
