@@ -31,10 +31,7 @@ def lambda_handler(event, context: LambdaContext):
 
         sortKey = BaseEntry.generateSortKey(entry.createdAt, entry.entryId)
 
-        item = entry.toDict()
-        item["createdAt#entryId"] = sortKey
-
-        dynamoRetry(FOOD_TABLE.put_item, Item=item)
+        item = storeFoodData(sortKey, entry)
 
         return createResponse(200, "Food entry created successfully", item)
 
@@ -60,3 +57,12 @@ def createResponse(statusCode, message, data):
         }),
         'headers': {"Access-Control-Allow-Origin": "*"}
     }
+
+@tracer.capture_method
+def storeFoodData(sortKey, entry):
+    item = entry.toDict()
+    item["createdAt#entryId"] = sortKey
+
+    dynamoRetry(FOOD_TABLE.put_item, Item=item)
+
+    return item

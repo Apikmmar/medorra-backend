@@ -23,12 +23,7 @@ def lambda_handler(event, context: LambdaContext):
     try:
         userId = event["requestContext"]["authorizer"]["claims"]["sub"]
 
-        response = dynamoRetry(
-            USERS_TABLE.get_item,
-            Key={"userId": userId}
-        )
-
-        user = response.get("Item")
+        user = getUser(userId)
 
         if not user:
             return createResponse(404, "User not found", None)
@@ -73,3 +68,12 @@ def createResponse(statusCode, message, data):
         }),
         'headers': {"Access-Control-Allow-Origin": "*"}
     }
+
+@tracer.capture_method
+def getUser(userId):
+    response = dynamoRetry(
+            USERS_TABLE.get_item,
+            Key={"userId": userId}
+        ).get("Item")
+
+    return response
