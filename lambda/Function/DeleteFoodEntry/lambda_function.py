@@ -31,15 +31,7 @@ def lambda_handler(event, context: LambdaContext):
         if not existing:
             return createResponse(404, "Entry not found", None)
 
-        sortKey = existing["createdAt#entryId"]
-
-        dynamoRetry(
-            FOOD_TABLE.delete_item,
-            Key={
-                "userId": userId,
-                "createdAt#entryId": sortKey,
-            },
-        )
+        deleteFoodData(existing, userId)
 
         return createResponse(200, "Food entry deleted successfully", None)
 
@@ -52,17 +44,6 @@ def lambda_handler(event, context: LambdaContext):
         return createResponse(500, "The server encountered an unexpected condition that prevented it from fulfilling your request.", None)
 
 @tracer.capture_method
-def findEntry(userId, entryId):
-    response = dynamoRetry(
-        FOOD_TABLE.query,
-        KeyConditionExpression=Key("userId").eq(userId),
-        FilterExpression="entryId = :eid",
-        ExpressionAttributeValues={":eid": entryId},
-    )
-    items = response.get("Items", [])
-    return items[0] if items else None
-
-@tracer.capture_method
 def createResponse(statusCode, message, data):
     return {
         'statusCode': statusCode,
@@ -73,3 +54,26 @@ def createResponse(statusCode, message, data):
         }),
         'headers': {"Access-Control-Allow-Origin": "*"}
     }
+
+@tracer.capture_method
+def findEntry(userId, entryId):
+    items = dynamoRetry(
+        FOOD_TABLE.query,
+        KeyConditionExpression=Key("userId").eq(userId),
+        FilterExpression="entryId = :eid",
+        ExpressionAttributeValues={":eid": entryId},
+    ).get("Items", [])
+    
+    return items[0] if items else None
+
+@tracer.capture_method
+def deleteFoodData(existing, userId):
+    sortKey = existing["createdAt#entryId"]
+
+    dynamoRetry(
+        FOOD_TABLE.delete_item,
+        Key={
+            "userId": userId,
+            "createdAt#entryId": sortKey,
+        },
+    )

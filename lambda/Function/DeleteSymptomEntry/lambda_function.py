@@ -31,15 +31,7 @@ def lambda_handler(event, context: LambdaContext):
         if not existing:
             return createResponse(404, "Entry not found", None)
 
-        sortKey = existing["createdAt#entryId"]
-
-        dynamoRetry(
-            SYMPTOMS_TABLE.delete_item,
-            Key={
-                "userId": userId,
-                "createdAt#entryId": sortKey,
-            },
-        )
+        deleteSymptomData(existing, userId)
 
         return createResponse(200, "Symptom entry deleted successfully", None)
 
@@ -73,3 +65,15 @@ def createResponse(statusCode, message, data):
         }),
         'headers': {"Access-Control-Allow-Origin": "*"}
     }
+
+@tracer.capture_method
+def deleteSymptomData(existing, userId):
+    sortKey = existing["createdAt#entryId"]
+
+    dynamoRetry(
+        SYMPTOMS_TABLE.delete_item,
+        Key={
+            "userId": userId,
+            "createdAt#entryId": sortKey,
+        },
+    )

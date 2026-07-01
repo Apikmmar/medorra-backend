@@ -31,10 +31,7 @@ def lambda_handler(event, context: LambdaContext):
 
         sortKey = BaseEntry.generateSortKey(entry.createdAt, entry.entryId)
 
-        item = entry.toDict()
-        item["createdAt#entryId"] = sortKey
-
-        dynamoRetry(SYMPTOM_TABLE.put_item, Item=item)
+        item = storeSymptomData(entry, sortKey)
         
         return createResponse(200, "Symptom entry created successfully", item)
 
@@ -60,3 +57,12 @@ def createResponse(statusCode, message, data):
         }),
         'headers': {"Access-Control-Allow-Origin": "*"}
     }
+
+@tracer.capture_method
+def storeSymptomData(entry, sortKey):
+    item = entry.toDict()
+    item["createdAt#entryId"] = sortKey
+
+    dynamoRetry(SYMPTOM_TABLE.put_item, Item=item)
+
+    return item
