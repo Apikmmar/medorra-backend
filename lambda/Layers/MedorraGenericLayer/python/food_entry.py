@@ -1,3 +1,4 @@
+import uuid
 from dataclasses import dataclass, field
 from typing import Optional, List
 from base_entry import BaseEntry, ValidationError
@@ -73,7 +74,7 @@ class FoodEntry(BaseEntry):
         items = [FoodItem.fromDict(item) for item in data.get("items", [])]
         return cls(
             userId=data["userId"],
-            entryId=data.get("entryId"),
+            entryId=data.get("entryId") or str(uuid.uuid4()),
             timestamp=data.get("timestamp"),
             createdAt=data.get("createdAt"),
             updatedAt=data.get("updatedAt"),

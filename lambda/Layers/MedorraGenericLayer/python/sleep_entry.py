@@ -1,3 +1,4 @@
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional, List
@@ -120,7 +121,7 @@ class SleepEntry(BaseEntry):
         segments = [SleepSegment.fromDict(seg) for seg in data.get("segments", [])]
         return cls(
             userId=data["userId"],
-            entryId=data.get("entryId"),
+            entryId=data.get("entryId") or str(uuid.uuid4()),
             timestamp=data.get("timestamp"),
             createdAt=data.get("createdAt"),
             updatedAt=data.get("updatedAt"),

@@ -1,3 +1,4 @@
+import uuid
 from dataclasses import dataclass
 from typing import Optional
 from base_entry import BaseEntry, ValidationError
@@ -49,7 +50,7 @@ class MedicationEntry(BaseEntry):
     def fromDict(cls, data: dict) -> "MedicationEntry":
         return cls(
             userId=data["userId"],
-            entryId=data.get("entryId"),
+            entryId=data.get("entryId") or str(uuid.uuid4()),
             timestamp=data.get("timestamp"),
             createdAt=data.get("createdAt"),
             updatedAt=data.get("updatedAt"),

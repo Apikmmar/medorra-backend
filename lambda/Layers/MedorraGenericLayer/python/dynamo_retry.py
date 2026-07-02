@@ -1,5 +1,6 @@
 import time
 import random
+from decimal import Decimal
 from botocore.exceptions import ClientError
 from aws_lambda_powertools import Logger
 
@@ -16,8 +17,28 @@ RETRYABLE_ERROR_CODES = {
 MAX_RETRIES = 3
 BASE_DELAY = 0.1
 
+# Kwargs whose values may contain application data (and therefore floats)
+# that DynamoDB's boto3 resource API requires as Decimal.
+_FLOAT_CONVERT_KWARGS = {"Item", "ExpressionAttributeValues"}
+
+
+def _convertFloatsToDecimal(value):
+    if isinstance(value, float):
+        return Decimal(str(value))
+    if isinstance(value, dict):
+        return {k: _convertFloatsToDecimal(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_convertFloatsToDecimal(v) for v in value]
+    return value
+
+
 def dynamoRetry(operation, **kwargs):
     lastException = None
+
+    kwargs = {
+        key: (_convertFloatsToDecimal(value) if key in _FLOAT_CONVERT_KWARGS else value)
+        for key, value in kwargs.items()
+    }
 
     for attempt in range(MAX_RETRIES + 1):
         try:
