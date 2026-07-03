@@ -4,6 +4,7 @@ import boto3
 from boto3.dynamodb.conditions import Key
 from botocore.exceptions import ClientError
 from dynamo_retry import dynamoRetry
+from json_encoder import DecimalEncoder
 from datetime import datetime
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.utilities.typing import LambdaContext
@@ -84,6 +85,6 @@ def createResponse(statusCode, message, data):
             'status': True if statusCode == 200 else False,
             'message': message,
             'data': data
-        }),
+        }, cls=DecimalEncoder),
         'headers': {"Access-Control-Allow-Origin": "*"}
     }

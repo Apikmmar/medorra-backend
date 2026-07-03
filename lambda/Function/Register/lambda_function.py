@@ -4,6 +4,7 @@ import boto3
 from botocore.exceptions import ClientError
 from registration_validator import validateRegistration
 from base_entry import ValidationError
+from json_encoder import DecimalEncoder
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.utilities.typing import LambdaContext
 
@@ -60,6 +61,6 @@ def createResponse(statusCode, message, data):
             'status': True if statusCode == 200 else False,
             'message': message,
             'data': data
-        }),
+        }, cls=DecimalEncoder),
         'headers': {"Access-Control-Allow-Origin": "*"}
     }

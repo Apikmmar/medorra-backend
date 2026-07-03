@@ -7,6 +7,7 @@ from botocore.exceptions import ClientError
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 from dynamo_retry import dynamoRetry
+from json_encoder import DecimalEncoder
 from user_isolation import enforceUserIsolation
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.utilities.typing import LambdaContext
@@ -99,7 +100,7 @@ def createResponse(statusCode, message, data):
             'status': True if statusCode == 200 else False,
             'message': message,
             'data': data
-        }),
+        }, cls=DecimalEncoder),
         'headers': {"Access-Control-Allow-Origin": "*"}
     }
 
