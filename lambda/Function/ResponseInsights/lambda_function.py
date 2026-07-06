@@ -54,9 +54,14 @@ def lambda_handler(event, context: LambdaContext):
         updatedItem["updatedAt"] = now
         updatedItem["userResponse"] = userResponse
 
-        dynamoRetry(INSIGHTS_TABLE.put_item, Item=updatedItem)
+        storeInsights(updatedItem)
 
-        return createResponse(200, f"Insight {newStatus} successfully", {"insightId": insightId, "status": newStatus})
+        data = {
+            "insightId": insightId, 
+            "status": newStatus
+        }
+
+        return createResponse(200, f"Insight {newStatus} successfully", data)
 
     except Exception as e:
         tracer.put_annotation("lambda_error", "true")
@@ -65,6 +70,18 @@ def lambda_handler(event, context: LambdaContext):
         tracer.put_metadata("message", str(e))
         logger.exception({"message": str(e)})
         return createResponse(500, "The server encountered an unexpected condition that prevented it from fulfilling your request.", None)
+
+@tracer.capture_method
+def createResponse(statusCode, message, data):
+    return {
+        'statusCode': statusCode,
+        'body': json.dumps({
+            'status': True if statusCode == 200 else False,
+            'message': message,
+            'data': data
+        }, cls=DecimalEncoder),
+        'headers': {"Access-Control-Allow-Origin": "*"}
+    }
 
 @tracer.capture_method
 def findInsight(userId, insightId):
@@ -78,13 +95,8 @@ def findInsight(userId, insightId):
     return items[0] if items else None
 
 @tracer.capture_method
-def createResponse(statusCode, message, data):
-    return {
-        'statusCode': statusCode,
-        'body': json.dumps({
-            'status': True if statusCode == 200 else False,
-            'message': message,
-            'data': data
-        }, cls=DecimalEncoder),
-        'headers': {"Access-Control-Allow-Origin": "*"}
-    }
+def storeInsights(updatedItem):
+    dynamoRetry(
+        INSIGHTS_TABLE.put_item, 
+        Item=updatedItem
+    )

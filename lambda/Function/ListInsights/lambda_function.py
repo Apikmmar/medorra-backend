@@ -45,15 +45,6 @@ def lambda_handler(event, context: LambdaContext):
         return createResponse(500, "The server encountered an unexpected condition that prevented it from fulfilling your request.", None)
 
 @tracer.capture_method
-def getInsights(userId):
-    response = dynamoRetry(
-        INSIGHTS_TABLE.query,
-        KeyConditionExpression=Key("userId").eq(userId),
-        ScanIndexForward=False,
-    )
-    return response.get("Items", [])
-
-@tracer.capture_method
 def createResponse(statusCode, message, data):
     return {
         'statusCode': statusCode,
@@ -64,3 +55,12 @@ def createResponse(statusCode, message, data):
         }, cls=DecimalEncoder),
         'headers': {"Access-Control-Allow-Origin": "*"}
     }
+
+@tracer.capture_method
+def getInsights(userId):
+    response = dynamoRetry(
+        INSIGHTS_TABLE.query,
+        KeyConditionExpression=Key("userId").eq(userId),
+        ScanIndexForward=False,
+    )
+    return response.get("Items", [])

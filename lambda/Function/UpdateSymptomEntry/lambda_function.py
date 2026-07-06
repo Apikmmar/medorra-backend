@@ -55,14 +55,7 @@ def lambda_handler(event, context: LambdaContext):
         item["updatedAt"] = now
         item["version"] = currentVersion + 1
 
-        dynamoRetry(
-            SYMPTOMS_TABLE.put_item,
-            Item=item,
-            ConditionExpression="attribute_exists(userId) AND version = :expectedVersion",
-            ExpressionAttributeValues={
-                ":expectedVersion": currentVersion,
-            },
-        )
+        updateSymptom(item, currentVersion)
 
         return createResponse(200, "Symptom entry updated successfully", item)
 
@@ -82,6 +75,18 @@ def lambda_handler(event, context: LambdaContext):
         return createResponse(500, "The server encountered an unexpected condition that prevented it from fulfilling your request.", None)
 
 @tracer.capture_method
+def createResponse(statusCode, message, data):
+    return {
+        'statusCode': statusCode,
+        'body': json.dumps({
+            'status': True if statusCode == 200 else False,
+            'message': message,
+            'data': data
+        }, cls=DecimalEncoder),
+        'headers': {"Access-Control-Allow-Origin": "*"}
+    }
+
+@tracer.capture_method
 def findEntry(userId, entryId):
     response = dynamoRetry(
         SYMPTOMS_TABLE.query,
@@ -93,13 +98,12 @@ def findEntry(userId, entryId):
     return items[0] if items else None
 
 @tracer.capture_method
-def createResponse(statusCode, message, data):
-    return {
-        'statusCode': statusCode,
-        'body': json.dumps({
-            'status': True if statusCode == 200 else False,
-            'message': message,
-            'data': data
-        }, cls=DecimalEncoder),
-        'headers': {"Access-Control-Allow-Origin": "*"}
-    }
+def updateSymptom(item, currentVersion):
+    dynamoRetry(
+        SYMPTOMS_TABLE.put_item,
+        Item=item,
+        ConditionExpression="attribute_exists(userId) AND version = :expectedVersion",
+        ExpressionAttributeValues={
+            ":expectedVersion": currentVersion,
+        },
+    )

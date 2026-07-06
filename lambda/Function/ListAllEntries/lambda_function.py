@@ -81,6 +81,18 @@ def lambda_handler(event, context: LambdaContext):
         return createResponse(500, "The server encountered an unexpected condition that prevented it from fulfilling your request.", None)
 
 @tracer.capture_method
+def createResponse(statusCode, message, data):
+    return {
+        'statusCode': statusCode,
+        'body': json.dumps({
+            'status': True if statusCode == 200 else False,
+            'message': message,
+            'data': data
+        }, cls=DecimalEncoder),
+        'headers': {"Access-Control-Allow-Origin": "*"}
+    }
+
+@tracer.capture_method
 def queryTable(tableName, userId, startDate, endDate, entryType):
     table = dynamodb.Table(tableName)
 
@@ -115,15 +127,3 @@ def queryTable(tableName, userId, startDate, endDate, entryType):
             break
 
     return {"items": items, "count": len(items)}
-
-@tracer.capture_method
-def createResponse(statusCode, message, data):
-    return {
-        'statusCode': statusCode,
-        'body': json.dumps({
-            'status': True if statusCode == 200 else False,
-            'message': message,
-            'data': data
-        }, cls=DecimalEncoder),
-        'headers': {"Access-Control-Allow-Origin": "*"}
-    }
