@@ -15,6 +15,7 @@ class DynamoDBStack(Construct):
             'Food',
             'Sleep',
             'Insights',
+            'TokenUsage'
         ]
 
         sort_keys = {
@@ -23,6 +24,7 @@ class DynamoDBStack(Construct):
             'Food': 'createdAt#entryId',
             'Sleep': 'createdAt#entryId',
             'Insights': 'confidence#insightId',
+            'TokenUsage': 'createdAt#usageId',
         }
 
         stream_tables = ['Symptoms', 'Medications', 'Food', 'Sleep']

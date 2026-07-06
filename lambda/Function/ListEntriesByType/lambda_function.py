@@ -73,12 +73,24 @@ def lambda_handler(event, context: LambdaContext):
         items = response.get("Items", [])
         lastEvaluatedKey = response.get("LastEvaluatedKey")
 
-        countResponse = dynamoRetry(
-            table.query,
-            KeyConditionExpression=Key("userId").eq(userId),
-            Select="COUNT",
-        )
-        totalCount = countResponse.get("Count", 0)
+        # Count must honor the same filters (including date range) as the query,
+        # and be paginated since a COUNT query is capped at 1MB scanned per call.
+        totalCount = 0
+        countKey = None
+        while True:
+            countKwargs = {
+                "KeyConditionExpression": keyCondition,
+                "Select": "COUNT",
+            }
+            if countKey:
+                countKwargs["ExclusiveStartKey"] = countKey
+
+            countResponse = dynamoRetry(table.query, **countKwargs)
+            totalCount += countResponse.get("Count", 0)
+
+            countKey = countResponse.get("LastEvaluatedKey")
+            if not countKey:
+                break
 
         data = {
             "entries": items,

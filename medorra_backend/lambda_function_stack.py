@@ -304,6 +304,7 @@ class LambdaStack(Construct):
                 "SLEEP_TABLE_NAME": tables['Sleep'].table_name,
                 "FOOD_TABLE_NAME": tables['Food'].table_name,
                 "INSIGHTS_TABLE_NAME": tables['Insights'].table_name,
+                "TOKEN_USAGE_TABLE_NAME": tables['TokenUsage'].table_name,
                 "BEDROCK_MODEL_ID": 'anthropic.claude-3-haiku-20240307-v1:0'
             },
         )
