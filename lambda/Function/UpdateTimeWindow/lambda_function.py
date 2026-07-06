@@ -32,16 +32,7 @@ def lambda_handler(event, context: LambdaContext):
         if not isinstance(timeWindow, int) or timeWindow < MIN_TIME_WINDOW or timeWindow > MAX_TIME_WINDOW:
             return createResponse(400, f"timeWindow must be an integer between {MIN_TIME_WINDOW} and {MAX_TIME_WINDOW}", {"field": "timeWindow"})
     
-        dynamoRetry(
-            USERS_TABLE.update_item,
-            Key={"userId": userId},
-            UpdateExpression="SET timeWindow = :tw",
-            ExpressionAttributeValues={":tw": timeWindow},
-        )
-
-        data = {
-            "timeWindow": timeWindow
-        }
+        data = updateUser(userId, timeWindow)
         
         return createResponse(200, "Time window updated successfully", data)
 
@@ -64,3 +55,18 @@ def createResponse(statusCode, message, data):
         }, cls=DecimalEncoder),
         'headers': {"Access-Control-Allow-Origin": "*"}
     }
+
+@tracer.capture_method
+def updateUser(userId, timeWindow):
+    dynamoRetry(
+        USERS_TABLE.update_item,
+        Key={"userId": userId},
+        UpdateExpression="SET timeWindow = :tw",
+        ExpressionAttributeValues={":tw": timeWindow},
+    )
+
+    data = {
+        "timeWindow": timeWindow
+    }
+
+    return data

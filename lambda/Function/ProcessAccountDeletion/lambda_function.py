@@ -144,8 +144,8 @@ def notifyUser(email):
 @tracer.capture_method
 def deleteUser(userId):
     dynamoRetry(
-        USERS_TABLE.delete_item
-        , Key={"userId": userId}
+        USERS_TABLE.delete_item, 
+        Key={"userId": userId}
     )
 
 @tracer.capture_method

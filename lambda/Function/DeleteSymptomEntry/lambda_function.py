@@ -45,17 +45,6 @@ def lambda_handler(event, context: LambdaContext):
         return createResponse(500, "The server encountered an unexpected condition that prevented it from fulfilling your request.", None)
 
 @tracer.capture_method
-def findEntry(userId, entryId):
-    response = dynamoRetry(
-        SYMPTOMS_TABLE.query,
-        KeyConditionExpression=Key("userId").eq(userId),
-        FilterExpression="entryId = :eid",
-        ExpressionAttributeValues={":eid": entryId},
-    )
-    items = response.get("Items", [])
-    return items[0] if items else None
-
-@tracer.capture_method
 def createResponse(statusCode, message, data):
     return {
         'statusCode': statusCode,
@@ -66,6 +55,17 @@ def createResponse(statusCode, message, data):
         }, cls=DecimalEncoder),
         'headers': {"Access-Control-Allow-Origin": "*"}
     }
+
+@tracer.capture_method
+def findEntry(userId, entryId):
+    response = dynamoRetry(
+        SYMPTOMS_TABLE.query,
+        KeyConditionExpression=Key("userId").eq(userId),
+        FilterExpression="entryId = :eid",
+        ExpressionAttributeValues={":eid": entryId},
+    )
+    items = response.get("Items", [])
+    return items[0] if items else None
 
 @tracer.capture_method
 def deleteSymptomData(existing, userId):

@@ -55,14 +55,7 @@ def lambda_handler(event, context: LambdaContext):
         item["updatedAt"] = now
         item["version"] = currentVersion + 1
 
-        dynamoRetry(
-            FOOD_TABLE.put_item,
-            Item=item,
-            ConditionExpression="attribute_exists(userId) AND version = :expectedVersion",
-            ExpressionAttributeValues={
-                ":expectedVersion": currentVersion,
-            },
-        )
+        updateFood(item, currentVersion)
 
         return createResponse(200, "Food entry updated successfully", item)
 
@@ -82,17 +75,6 @@ def lambda_handler(event, context: LambdaContext):
         return createResponse(500, "The server encountered an unexpected condition that prevented it from fulfilling your request.", None)
 
 @tracer.capture_method
-def findEntry(userId, entryId):
-    response = dynamoRetry(
-        FOOD_TABLE.query,
-        KeyConditionExpression=Key("userId").eq(userId),
-        FilterExpression="entryId = :eid",
-        ExpressionAttributeValues={":eid": entryId},
-    )
-    items = response.get("Items", [])
-    return items[0] if items else None
-
-@tracer.capture_method
 def createResponse(statusCode, message, data):
     return {
         'statusCode': statusCode,
@@ -103,3 +85,24 @@ def createResponse(statusCode, message, data):
         }, cls=DecimalEncoder),
         'headers': {"Access-Control-Allow-Origin": "*"}
     }
+
+@tracer.capture_method
+def findEntry(userId, entryId):
+    response = dynamoRetry(
+        FOOD_TABLE.query,
+        KeyConditionExpression=Key("userId").eq(userId),
+        FilterExpression="entryId = :eid",
+        ExpressionAttributeValues={":eid": entryId},
+    )
+    items = response.get("Items", [])
+    return items[0] if items else None
+
+def updateFood(item, currentVersion):
+    dynamoRetry(
+        FOOD_TABLE.put_item,
+        Item=item,
+        ConditionExpression="attribute_exists(userId) AND version = :expectedVersion",
+        ExpressionAttributeValues={
+            ":expectedVersion": currentVersion,
+        },
+    )

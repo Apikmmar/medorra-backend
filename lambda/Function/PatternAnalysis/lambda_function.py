@@ -77,8 +77,7 @@ def lambda_handler(event, context: LambdaContext):
             remainingDays = MINIMUM_LOGGING_DAYS - distinctLoggingDays
             return createResponse(200, f"Threshold not met. {remainingDays} more days needed.", {"remainingDays": remainingDays})
 
-        timeWindow = userConfig.get("timeWindow", DEFAULT_TIME_WINDOW)
-
+        timeWindow = getTimeWindow()
         entries = fetchAllEntries(userId, timeWindow)
 
         if not entries:
@@ -122,6 +121,10 @@ def getUserConfig(userId):
         Key={"userId": userId},
     )
     return response.get("Item")
+
+@tracer.capture_method
+def getTimeWindow():
+    return userConfig.get("timeWindow", DEFAULT_TIME_WINDOW)
 
 @tracer.capture_method
 def fetchAllEntries(userId, timeWindow):
@@ -260,13 +263,7 @@ def storeInsights(userId, insights):
 
     for existing in existingInsights:
         if existing.get("status") == "active":
-            dynamoRetry(
-                INSIGHTS_TABLE.delete_item,
-                Key={
-                    "userId": userId,
-                    "confidence#insightId": existing["confidence#insightId"],
-                },
-            )
+            deleteInsights(userId, existing)
 
     for insight in insights:
         insightId = str(uuid.uuid4())
@@ -292,7 +289,20 @@ def storeInsights(userId, insights):
             "updatedAt": now,
         }
 
-        dynamoRetry(INSIGHTS_TABLE.put_item, Item=payload)
+        dynamoRetry(
+            INSIGHTS_TABLE.put_item, 
+            Item=payload
+        )
+
+@tracer.capture_method
+def deleteInsights(userId, existing):
+    dynamoRetry(
+        INSIGHTS_TABLE.delete_item,
+        Key={
+            "userId": userId,
+            "confidence#insightId": existing["confidence#insightId"],
+        },
+    )
 
 @tracer.capture_method
 def getExistingInsights(userId):

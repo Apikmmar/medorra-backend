@@ -29,7 +29,6 @@ tracer = Tracer()
 def lambda_handler(event, context: LambdaContext):
     try:
         userId = event["requestContext"]["authorizer"]["claims"]["sub"]
-
         params = event.get("queryStringParameters") or {}
 
         entryType = params.get("type")
@@ -47,50 +46,10 @@ def lambda_handler(event, context: LambdaContext):
         if startDate and endDate and startDate > endDate:
             return createResponse(400, "Start date must not be after end date", {"field": "startDate"})
 
-        tableName = TABLE_MAP[entryType]
-        table = dynamodb.Table(tableName)
+        table = dynamodb.Table(TABLE_MAP[entryType])
 
-        keyCondition = Key("userId").eq(userId)
-
-        if startDate and endDate:
-            keyCondition = keyCondition & Key("createdAt#entryId").between(startDate, endDate + "~")
-        elif startDate:
-            keyCondition = keyCondition & Key("createdAt#entryId").gte(startDate)
-        elif endDate:
-            keyCondition = keyCondition & Key("createdAt#entryId").lte(endDate + "~")
-
-        queryKwargs = {
-            "KeyConditionExpression": keyCondition,
-            "ScanIndexForward": False,
-            "Limit": pageSize,
-        }
-
-        if lastKey:
-            queryKwargs["ExclusiveStartKey"] = json.loads(lastKey)
-
-        response = dynamoRetry(table.query, **queryKwargs)
-
-        items = response.get("Items", [])
-        lastEvaluatedKey = response.get("LastEvaluatedKey")
-
-        # Count must honor the same filters (including date range) as the query,
-        # and be paginated since a COUNT query is capped at 1MB scanned per call.
-        totalCount = 0
-        countKey = None
-        while True:
-            countKwargs = {
-                "KeyConditionExpression": keyCondition,
-                "Select": "COUNT",
-            }
-            if countKey:
-                countKwargs["ExclusiveStartKey"] = countKey
-
-            countResponse = dynamoRetry(table.query, **countKwargs)
-            totalCount += countResponse.get("Count", 0)
-
-            countKey = countResponse.get("LastEvaluatedKey")
-            if not countKey:
-                break
+        items, lastEvaluatedKey = queryEntries(table, userId, startDate, endDate, pageSize, lastKey)
+        totalCount = countEntries(table, userId)
 
         data = {
             "entries": items,
@@ -120,3 +79,45 @@ def createResponse(statusCode, message, data):
         }, cls=DecimalEncoder),
         'headers': {"Access-Control-Allow-Origin": "*"}
     }
+
+@tracer.capture_method
+def buildKeyCondition(userId, startDate, endDate):
+    keyCondition = Key("userId").eq(userId)
+
+    if startDate and endDate:
+        keyCondition = keyCondition & Key("createdAt#entryId").between(startDate, endDate + "~")
+    elif startDate:
+        keyCondition = keyCondition & Key("createdAt#entryId").gte(startDate)
+    elif endDate:
+        keyCondition = keyCondition & Key("createdAt#entryId").lte(endDate + "~")
+
+    return keyCondition
+
+@tracer.capture_method
+def queryEntries(table, userId, startDate, endDate, pageSize, lastKey):
+    keyCondition = buildKeyCondition(userId, startDate, endDate)
+
+    queryKwargs = {
+        "KeyConditionExpression": keyCondition,
+        "ScanIndexForward": False,
+        "Limit": pageSize,
+    }
+
+    if lastKey:
+        queryKwargs["ExclusiveStartKey"] = json.loads(lastKey)
+
+    response = dynamoRetry(table.query, **queryKwargs)
+
+    items = response.get("Items", [])
+    lastEvaluatedKey = response.get("LastEvaluatedKey")
+
+    return items, lastEvaluatedKey
+
+@tracer.capture_method
+def countEntries(table, userId):
+    countResponse = dynamoRetry(
+        table.query,
+        KeyConditionExpression=Key("userId").eq(userId),
+        Select="COUNT",
+    )
+    return countResponse.get("Count", 0)
