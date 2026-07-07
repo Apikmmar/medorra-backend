@@ -77,7 +77,7 @@ def lambda_handler(event, context: LambdaContext):
             remainingDays = MINIMUM_LOGGING_DAYS - distinctLoggingDays
             return createResponse(200, f"Threshold not met. {remainingDays} more days needed.", {"remainingDays": remainingDays})
 
-        timeWindow = getTimeWindow()
+        timeWindow = getTimeWindow(userConfig)
         entries = fetchAllEntries(userId, timeWindow)
 
         if not entries:
@@ -123,12 +123,12 @@ def getUserConfig(userId):
     return response.get("Item")
 
 @tracer.capture_method
-def getTimeWindow():
+def getTimeWindow(userConfig):
     return userConfig.get("timeWindow", DEFAULT_TIME_WINDOW)
 
 @tracer.capture_method
 def fetchAllEntries(userId, timeWindow):
-    cutoffDate = (datetime.utcnow() - timedelta(days=timeWindow)).strftime('%Y-%m-%dT%H:%M:%S')
+    cutoffDate = (datetime.utcnow() - timedelta(days=int(timeWindow))).strftime('%Y-%m-%dT%H:%M:%S')
 
     allEntries = {}
 

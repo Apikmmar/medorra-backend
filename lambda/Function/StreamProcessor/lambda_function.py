@@ -53,7 +53,7 @@ def lambda_handler(event, context: LambdaContext):
                 ]
             )
 
-        return createResponse(200, "Login Successful", data)
+        return createResponse(200, "Stream records processed successfully", {"processedUsers": len(processedUsers)})
 
     except ClientError as e:
         logger.exception({"message": str(e)})
@@ -89,6 +89,6 @@ def isEligible(userId):
     if not response:
         return False
 
-    distinctLoggingDays = user.get("distinctLoggingDays")
+    distinctLoggingDays = response.get("distinctLoggingDays", 0)
 
     return distinctLoggingDays >= MINIMUM_LOGGING_DAYS
