@@ -9,10 +9,14 @@ from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.utilities.typing import LambdaContext
 
 INSIGHTS_TABLE_NAME = os.environ.get("INSIGHTS_TABLE_NAME")
+USERS_TABLE_NAME = os.environ.get("USERS_TABLE_NAME")
 
 dynamodb = boto3.resource("dynamodb")
 
 INSIGHTS_TABLE = dynamodb.Table(INSIGHTS_TABLE_NAME)
+USERS_TABLE = dynamodb.Table(USERS_TABLE_NAME)
+
+MINIMUM_LOGGING_DAYS = 14
 
 logger = Logger()
 tracer = Tracer()
@@ -22,17 +26,34 @@ def lambda_handler(event, context: LambdaContext):
     try:
         userId = event["requestContext"]["authorizer"]["claims"]["sub"]
 
+        totalDistinctDays = getDistinctLoggingDays(userId)
+        thresholdMet = totalDistinctDays >= MINIMUM_LOGGING_DAYS
+        daysRemaining = max(0, MINIMUM_LOGGING_DAYS - totalDistinctDays)
+
+        if not thresholdMet:
+            data = {
+                "insights": [],
+                "totalCount": 0,
+                "thresholdMet": False,
+                "daysRemaining": daysRemaining,
+                "totalDistinctDays": totalDistinctDays,
+            }
+            return createResponse(200, f"{daysRemaining} more days needed", data)
+
         allInsights = getInsights(userId)
 
         activeInsights = [i for i in allInsights if i.get("status") != "dismissed"]
 
-        if not activeInsights:
-            return createResponse(200, "No patterns detected yet", {"insights": [], "totalCount": 0})
-
         data = {
             "insights": activeInsights,
             "totalCount": len(activeInsights),
+            "thresholdMet": True,
+            "daysRemaining": 0,
+            "totalDistinctDays": totalDistinctDays,
         }
+
+        if not activeInsights:
+            return createResponse(200, "No patterns detected yet", data)
 
         return createResponse(200, "Insights retrieved successfully", data)
 
@@ -64,3 +85,15 @@ def getInsights(userId):
         ScanIndexForward=False,
     )
     return response.get("Items", [])
+
+@tracer.capture_method
+def getDistinctLoggingDays(userId):
+    user = dynamoRetry(
+        USERS_TABLE.get_item,
+        Key={"userId": userId},
+    ).get("Item")
+
+    if not user:
+        return 0
+
+    return int(user.get("distinctLoggingDays", 0))

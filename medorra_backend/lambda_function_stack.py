@@ -342,6 +342,7 @@ class LambdaStack(Construct):
             layers=[powertools_layer, medorra_generic_layer],
             environment={
                 "INSIGHTS_TABLE_NAME": tables["Insights"].table_name,
+                "USERS_TABLE_NAME": tables["Users"].table_name,
                 "SYMPTOMS_TABLE_NAME": tables["Symptoms"].table_name,
                 "MEDICATIONS_TABLE_NAME": tables["Medications"].table_name,
                 "FOOD_TABLE_NAME": tables["Food"].table_name,

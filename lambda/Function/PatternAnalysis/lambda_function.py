@@ -279,7 +279,7 @@ def storeInsights(userId, insights):
             "trigger": insight.get("trigger", {}),
             "correlatedSymptom": insight.get("correlatedSymptom", ""),
             "averageDelay": insight.get("averageDelay", ""),
-            "confidenceScore": str(confidenceScore),
+            "confidenceScore": confidenceScore,
             "summary": insight.get("summary", ""),
             "supportingEntryIds": insight.get("supportingEntryIds", []),
             "status": "active",
