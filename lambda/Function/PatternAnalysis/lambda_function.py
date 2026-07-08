@@ -21,9 +21,10 @@ SLEEP_TABLE_NAME = os.environ.get("SLEEP_TABLE_NAME")
 INSIGHTS_TABLE_NAME = os.environ.get("INSIGHTS_TABLE_NAME")
 TOKEN_USAGE_TABLE_NAME = os.environ.get("TOKEN_USAGE_TABLE_NAME")
 BEDROCK_MODEL_ID = os.environ.get("BEDROCK_MODEL_ID")
+BEDROCK_REGION = os.environ.get("BEDROCK_REGION")
 
 dynamodb = boto3.resource("dynamodb")
-bedrock = boto3.client("bedrock-runtime")
+bedrock = boto3.client("bedrock-runtime", region_name=BEDROCK_REGION)
 
 USERS_TABLE = dynamodb.Table(USERS_TABLE_NAME)
 SYMPTOMS_TABLE = dynamodb.Table(SYMPTOMS_TABLE_NAME)
@@ -44,15 +45,6 @@ MINIMUM_LOGGING_DAYS = 14
 DEFAULT_TIME_WINDOW = 3
 MIN_CONFIDENCE = 0.6
 MAX_INSIGHTS = 20
-
-# Bedrock on-demand pricing in USD per 1,000 tokens, keyed by model id.
-# Extend this map as new models are enabled.
-MODEL_PRICING = {
-    "anthropic.claude-3-haiku-20240307-v1:0": {"input": 0.00025, "output": 0.00125},
-    "anthropic.claude-3-sonnet-20240229-v1:0": {"input": 0.003, "output": 0.015},
-    "anthropic.claude-3-5-sonnet-20240620-v1:0": {"input": 0.003, "output": 0.015},
-    "anthropic.claude-3-opus-20240229-v1:0": {"input": 0.015, "output": 0.075},
-}
 
 logger = Logger()
 tracer = Tracer()
@@ -327,23 +319,8 @@ def getExistingInsights(userId):
     return items
 
 @tracer.capture_method
-def calculateCost(model, inputTokens, outputTokens):
-    """Estimate invocation cost in USD from token counts and per-model pricing."""
-    pricing = MODEL_PRICING.get(model)
-    if not pricing:
-        logger.warning({"message": "No pricing configured for model", "model": model})
-        return 0.0
-
-    cost = (inputTokens / 1000.0) * pricing["input"] + (outputTokens / 1000.0) * pricing["output"]
-    return round(cost, 6)
-
-@tracer.capture_method
 def storeTokenUsage(userId, inputTokens, outputTokens):
-    """Persist a token-usage record for a single Bedrock invocation.
 
-    Best-effort: failures are logged but never propagate, so usage accounting
-    can never break the primary analysis flow.
-    """
     if TOKEN_USAGE_TABLE is None:
         logger.warning({"message": "TOKEN_USAGE_TABLE_NAME not configured; skipping usage record"})
         return
@@ -352,33 +329,20 @@ def storeTokenUsage(userId, inputTokens, outputTokens):
         now = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S.%fZ')
         usageId = str(uuid.uuid4())
         totalTokens = inputTokens + outputTokens
-        estimatedCost = calculateCost(BEDROCK_MODEL_ID, inputTokens, outputTokens)
 
         payload = {
             "userId": userId,
-            "createdAt#usageId": f"{now}#{usageId}",
             "usageId": usageId,
+            "createdAt#usageId": f"{now}#{usageId}",
             "operation": "pattern_analysis",
             "model": BEDROCK_MODEL_ID,
             "inputTokens": inputTokens,
             "outputTokens": outputTokens,
             "totalTokens": totalTokens,
-            # Float is converted to Decimal inside dynamoRetry before writing.
-            "estimatedCostUsd": estimatedCost,
             "createdAt": now,
         }
 
         dynamoRetry(TOKEN_USAGE_TABLE.put_item, Item=payload)
-
-        logger.info({
-            "message": "Token usage recorded",
-            "userId": userId,
-            "model": BEDROCK_MODEL_ID,
-            "inputTokens": inputTokens,
-            "outputTokens": outputTokens,
-            "totalTokens": totalTokens,
-            "estimatedCostUsd": estimatedCost,
-        })
 
     except Exception as e:
         logger.warning({"message": "Failed to record token usage", "error": str(e)})
