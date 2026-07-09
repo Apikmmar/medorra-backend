@@ -8,7 +8,7 @@ from .lambda_layers_stack import create_layers
 
 class LambdaStack(Construct):
 
-    def __init__(self, scope: Construct, construct_id: str, dynamo_db_stack, cognito_stack, prefix: str, **kwargs) -> None:
+    def __init__(self, scope: Construct, construct_id: str, dynamo_db_stack, cognito_stack,medorra_s3_bucket, prefix: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
         powertools_layer, medorra_generic_layer = create_layers(self)
@@ -295,7 +295,7 @@ class LambdaStack(Construct):
             handler="lambda_function.lambda_handler",
             code=lambda_.Code.from_asset("lambda/Function/PatternAnalysis"),
             timeout=Duration.seconds(300),
-            memory_size=128,
+            memory_size=256,
             layers=[powertools_layer, medorra_generic_layer],
             environment={
                 "USERS_TABLE_NAME": tables['Users'].table_name,
@@ -306,7 +306,10 @@ class LambdaStack(Construct):
                 "INSIGHTS_TABLE_NAME": tables['Insights'].table_name,
                 "TOKEN_USAGE_TABLE_NAME": tables['TokenUsage'].table_name,
                 "BEDROCK_MODEL_ID": 'us.anthropic.claude-sonnet-4-6',
-                "BEDROCK_REGION": 'us-west-2'
+                "BEDROCK_REGION": 'us-west-2',
+                "INSIGHT_BUCKET": medorra_s3_bucket.bucket_name,
+                "POLLY_VOICE_ID": "Joanna",
+                "POLLY_ENGINE": "neural"
             },
         )
 
@@ -316,6 +319,15 @@ class LambdaStack(Construct):
                 resources=["*"]
             )
         )
+
+        self.pattern_analysis_lambda.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["polly:SynthesizeSpeech"],
+                resources=["*"]
+            )
+        )
+
+        medorra_s3_bucket.grant_put(self.pattern_analysis_lambda)
 
         self.stream_processor_lambda = lambda_.Function(
             self, "StreamProcessorLambda",
@@ -348,8 +360,11 @@ class LambdaStack(Construct):
                 "MEDICATIONS_TABLE_NAME": tables["Medications"].table_name,
                 "FOOD_TABLE_NAME": tables["Food"].table_name,
                 "SLEEP_TABLE_NAME": tables["Sleep"].table_name,
+                "INSIGHT_BUCKET": medorra_s3_bucket.bucket_name,
             },
         )
+
+        medorra_s3_bucket.grant_read(self.list_insights_lambda)
 
         self.respond_insight_lambda = lambda_.Function(
             self, "RespondInsightLambda",

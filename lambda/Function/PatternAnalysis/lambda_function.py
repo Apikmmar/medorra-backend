@@ -22,9 +22,14 @@ INSIGHTS_TABLE_NAME = os.environ.get("INSIGHTS_TABLE_NAME")
 TOKEN_USAGE_TABLE_NAME = os.environ.get("TOKEN_USAGE_TABLE_NAME")
 BEDROCK_MODEL_ID = os.environ.get("BEDROCK_MODEL_ID")
 BEDROCK_REGION = os.environ.get("BEDROCK_REGION")
+INSIGHT_BUCKET = os.environ.get("INSIGHT_BUCKET")
+POLLY_VOICE_ID = os.environ.get("POLLY_VOICE_ID")
+POLLY_ENGINE = os.environ.get("POLLY_ENGINE")
 
 dynamodb = boto3.resource("dynamodb")
 bedrock = boto3.client("bedrock-runtime", region_name=BEDROCK_REGION)
+polly = boto3.client("polly", region_name=BEDROCK_REGION)
+s3 = boto3.client("s3")
 
 USERS_TABLE = dynamodb.Table(USERS_TABLE_NAME)
 SYMPTOMS_TABLE = dynamodb.Table(SYMPTOMS_TABLE_NAME)
@@ -132,7 +137,6 @@ def fetchAllEntries(userId, timeWindow):
             )
 
         for entryType, future in futures.items():
-            # Defense-in-depth: ensure every returned item belongs to the user.
             allEntries[entryType] = enforceUserIsolation(userId, future.result())
 
     return allEntries
@@ -193,7 +197,6 @@ def analyzeWithBedrock(userId, entries, timeWindow):
     responseBody = json.loads(response["body"].read())
     responseText = responseBody.get("content", [{}])[0].get("text", "")
 
-    # Record token usage for this invocation (best-effort; never fails the run).
     usage = responseBody.get("usage", {}) or {}
     storeTokenUsage(
         userId,
@@ -264,6 +267,9 @@ def storeInsights(userId, insights):
         confidenceStr = f"{confidenceScore:.2f}"
         sortKey = f"{confidenceStr}#{insightId}"
 
+        summary = insight.get("summary", "")
+        audioKey = synthesizeInsightAudio(userId, insightId, summary)
+
         payload = {
             "userId": userId,
             "confidence#insightId": sortKey,
@@ -272,7 +278,7 @@ def storeInsights(userId, insights):
             "correlatedSymptom": insight.get("correlatedSymptom", ""),
             "averageDelay": insight.get("averageDelay", ""),
             "confidenceScore": confidenceScore,
-            "summary": insight.get("summary", ""),
+            "summary": summary,
             "supportingEntryIds": insight.get("supportingEntryIds", []),
             "status": "active",
             "status#confidence#insightId": f"active#{confidenceStr}#{insightId}",
@@ -280,6 +286,9 @@ def storeInsights(userId, insights):
             "createdAt": now,
             "updatedAt": now,
         }
+
+        if audioKey:
+            payload["audioKey"] = audioKey
 
         dynamoRetry(
             INSIGHTS_TABLE.put_item, 
@@ -346,3 +355,36 @@ def storeTokenUsage(userId, inputTokens, outputTokens):
 
     except Exception as e:
         logger.warning({"message": "Failed to record token usage", "error": str(e)})
+
+@tracer.capture_method
+def synthesizeInsightAudio(userId, insightId, text):
+    if not INSIGHT_BUCKET or not text:
+        return None
+
+    try:
+        response = polly.synthesize_speech(
+            Text=text,
+            VoiceId=POLLY_VOICE_ID,
+            Engine=POLLY_ENGINE,
+            OutputFormat="mp3",
+        )
+
+        audioStream = response.get("AudioStream")
+        if audioStream is None:
+            return None
+
+        audioBytes = audioStream.read()
+        key = f"{userId}/{insightId}.mp3"
+
+        s3.put_object(
+            Bucket=INSIGHT_BUCKET,
+            Key=key,
+            Body=audioBytes,
+            ContentType="audio/mpeg",
+        )
+
+        return key
+
+    except ClientError as e:
+        logger.warning({"message": "Failed to synthesize insight audio", "error": str(e)})
+        return None

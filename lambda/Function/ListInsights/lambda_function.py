@@ -10,13 +10,16 @@ from aws_lambda_powertools.utilities.typing import LambdaContext
 
 INSIGHTS_TABLE_NAME = os.environ.get("INSIGHTS_TABLE_NAME")
 USERS_TABLE_NAME = os.environ.get("USERS_TABLE_NAME")
+INSIGHT_BUCKET = os.environ.get("INSIGHT_BUCKET")
 
 dynamodb = boto3.resource("dynamodb")
+s3 = boto3.client("s3")
 
 INSIGHTS_TABLE = dynamodb.Table(INSIGHTS_TABLE_NAME)
 USERS_TABLE = dynamodb.Table(USERS_TABLE_NAME)
 
 MINIMUM_LOGGING_DAYS = 14
+AUDIO_URL_EXPIRY_SECONDS = 900
 
 logger = Logger()
 tracer = Tracer()
@@ -43,6 +46,9 @@ def lambda_handler(event, context: LambdaContext):
         allInsights = getInsights(userId)
 
         activeInsights = [i for i in allInsights if i.get("status") != "dismissed"]
+
+        for insight in activeInsights:
+            insight["audioUrl"] = buildAudioUrl(insight.get("audioKey"))
 
         data = {
             "insights": activeInsights,
@@ -97,3 +103,17 @@ def getDistinctLoggingDays(userId):
         return 0
 
     return int(user.get("distinctLoggingDays", 0))
+
+@tracer.capture_method
+def buildAudioUrl(audioKey):
+    if not audioKey or not INSIGHT_BUCKET:
+        return None
+    try:
+        return s3.generate_presigned_url(
+            "get_object",
+            Params={"Bucket": INSIGHT_BUCKET, "Key": audioKey},
+            ExpiresIn=AUDIO_URL_EXPIRY_SECONDS,
+        )
+    except ClientError as e:
+        logger.warning({"message": "Failed to presign audio URL", "error": str(e)})
+        return None
