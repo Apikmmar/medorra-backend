@@ -221,5 +221,14 @@ class ApiGatewayStack(Construct):
             authorizer=self.authorizer,
         )
 
+        batch_resource = entries_resource.add_resource("batch")
+        batch_resource.add_method(
+            "POST",
+            apigw.LambdaIntegration(lambda_stack.batch_get_entries_lambda),
+            authorization_type=apigw.AuthorizationType.COGNITO,
+            authorizer=self.authorizer,
+        )
+
+
         # --- Output ---
         CfnOutput(self, "ApiUrl", value=self.api.url, description="Medorra API Gateway URL")
