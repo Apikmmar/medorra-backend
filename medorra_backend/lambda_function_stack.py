@@ -11,7 +11,7 @@ class LambdaStack(Construct):
     def __init__(self, scope: Construct, construct_id: str, dynamo_db_stack, cognito_stack,medorra_s3_bucket, prefix: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
-        powertools_layer, medorra_generic_layer = create_layers(self)
+        powertools_layer, medorra_generic_layer, medorra_pywebpush_layer = create_layers(self)
         tables = dynamo_db_stack.tables
 
         self.register_lambda = lambda_.Function(
@@ -439,6 +439,50 @@ class LambdaStack(Construct):
             },
         )
 
+        self.update_reminder_settings_lambda = lambda_.Function(
+            self, "UpdateReminderSettingsLambda",
+            function_name=f"{prefix}UpdateReminderSettings",
+            runtime=lambda_.Runtime.PYTHON_3_14,
+            handler="lambda_function.lambda_handler",
+            code=lambda_.Code.from_asset("lambda/Function/UpdateReminderSettings"),
+            timeout=Duration.seconds(30),
+            memory_size=128,
+            layers=[powertools_layer, medorra_generic_layer],
+            environment={
+                "USERS_TABLE_NAME": tables["Users"].table_name
+            },
+        )
+
+        self.save_push_subscription_lambda = lambda_.Function(
+            self, "SavePushSubscriptionLambda",
+            function_name=f"{prefix}SavePushSubscription",
+            runtime=lambda_.Runtime.PYTHON_3_14,
+            handler="lambda_function.lambda_handler",
+            code=lambda_.Code.from_asset("lambda/Function/SavePushSubscription"),
+            timeout=Duration.seconds(30),
+            memory_size=128,
+            layers=[powertools_layer, medorra_generic_layer],
+            environment={
+                "USERS_TABLE_NAME": tables["Users"].table_name
+            },
+        )
+
+        self.send_logging_reminders_lambda = lambda_.Function(
+            self, "SendLoggingRemindersLambda",
+            function_name=f"{prefix}SendLoggingReminders",
+            runtime=lambda_.Runtime.PYTHON_3_14,
+            handler="lambda_function.lambda_handler",
+            code=lambda_.Code.from_asset("lambda/Function/SendLoggingReminders"),
+            timeout=Duration.seconds(300),
+            memory_size=256,
+            layers=[powertools_layer, medorra_generic_layer, medorra_pywebpush_layer],
+            environment={
+                "USERS_TABLE_NAME": tables["Users"].table_name,
+                "VAPID_PRIVATE_KEY": "private_key.pem",
+                "VAPID_SUBJECT": "mailto:noreply@medorra.com",
+            },
+        )
+
         all_lambdas = [
             self.register_lambda,
             self.login_lambda,
@@ -466,6 +510,10 @@ class LambdaStack(Construct):
             self.request_account_deletion_lambda,
             self.process_account_deletion_lambda,
             self.batch_get_entries_lambda,
+            self.update_reminder_settings_lambda,
+            self.save_push_subscription_lambda,
+            self.send_logging_reminders_lambda,
+
         ]
 
         for table in tables.values():

@@ -61,3 +61,11 @@ class DynamoDBStack(Construct):
                     index_name='-'.join(['gsi', 'status', 'confidence']),
                     projection_type=dynamodb.ProjectionType.ALL,
                 )
+
+            if table == 'Users':
+                ddb_table.add_global_secondary_index(
+                    partition_key=dynamodb.Attribute(name='reminderEnabledFlag', type=dynamodb.AttributeType.STRING),
+                    sort_key=dynamodb.Attribute(name='reminderHour', type=dynamodb.AttributeType.NUMBER),
+                    index_name='gsi-reminders',
+                    projection_type=dynamodb.ProjectionType.ALL,
+                )

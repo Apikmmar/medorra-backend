@@ -1,6 +1,8 @@
 import os
 import json
 import boto3
+from datetime import datetime
+from zoneinfo import ZoneInfo
 from botocore.exceptions import ClientError
 from dynamo_retry import dynamoRetry
 from json_encoder import DecimalEncoder
@@ -31,27 +33,32 @@ def lambda_handler(event, context: LambdaContext):
             if eventName not in ("INSERT", "MODIFY"):
                 continue
             
-            newImage = record.get("dynamodb", {}).get("NewImage", {})
-            userId = record.get("userId", {}).get("S")
+            dynamodbData = record.get("dynamodb", {})
+            newImage = dynamodbData.get("NewImage", {})
+            userId = dynamodbData.get("Keys", {}).get("userId", {}).get("S")
 
             if not userId or userId in processedUsers:
                 continue
 
             processedUsers.add(userId)
 
-            if not isEligible(userId):
+            user = getUser(userId)
+            if not user:
                 continue
 
-            eventbridge.put_events(
-                Entries=[
-                    {
+            # Always stamp the local logging date so reminders work even for
+            # users still building up to the analysis threshold.
+            updateLastLoggedDate(userId, user)
+
+            if user.get("distinctLoggingDays", 0) >= MINIMUM_LOGGING_DAYS:
+                eventbridge.put_events(
+                    Entries=[{
                         "Source": "medorra.entries",
                         "DetailType": "EntryCreated",
                         "Detail": json.dumps({"userId": userId}),
                         "EventBusName": EVENT_BUS_NAME,
-                    }
-                ]
-            )
+                    }]
+                )
 
         return createResponse(200, "Stream records processed successfully", {"processedUsers": len(processedUsers)})
 
@@ -80,15 +87,25 @@ def createResponse(statusCode, message, data):
     }
 
 @tracer.capture_method
-def isEligible(userId):
-    response = dynamoRetry(
-        USERS_TABLE.get_item,
+def getUser(userId):
+    respUser = dynamoRetry(
+        USERS_TABLE.get_item, 
         Key={"userId": userId}
     ).get("Item")
 
-    if not response:
-        return False
+    return respUser
 
-    distinctLoggingDays = response.get("distinctLoggingDays", 0)
+@tracer.capture_method
+def updateLastLoggedDate(userId, user):
+    timezone = user.get("timezone", "UTC")
+    todayLocal = datetime.now(ZoneInfo(timezone)).strftime("%Y-%m-%d")
 
-    return distinctLoggingDays >= MINIMUM_LOGGING_DAYS
+    if user.get("lastLoggedDate") == todayLocal:
+        return
+
+    dynamoRetry(
+        USERS_TABLE.update_item,
+        Key={"userId": userId},
+        UpdateExpression="SET lastLoggedDate = :d",
+        ExpressionAttributeValues={":d": todayLocal},
+    )

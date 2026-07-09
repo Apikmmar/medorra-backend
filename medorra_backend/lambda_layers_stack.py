@@ -22,4 +22,17 @@ def create_layers(scope: Construct):
         description="generic shared utilities layer"
     )
 
-    return powertools_layer, medorra_generic_layer
+    medorra_pywebpush_layer = lambda_.LayerVersion(
+        scope, "MedorraPywebPushLayer",
+        code=lambda_.Code.from_asset(
+            "lambda/Layers/MedorraPywebPushLayer",
+            bundling=BundlingOptions(
+                image=lambda_.Runtime.PYTHON_3_14.bundling_image,
+                command=["bash", "-c", "pip install -r requirements.txt -t /asset-output/python"]
+            )
+        ),
+        compatible_runtimes=[lambda_.Runtime.PYTHON_3_14],
+        description="web push (pywebpush) layer"
+    )
+
+    return powertools_layer, medorra_generic_layer, medorra_pywebpush_layer

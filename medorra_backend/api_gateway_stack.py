@@ -229,6 +229,27 @@ class ApiGatewayStack(Construct):
             authorizer=self.authorizer,
         )
 
+        reminders_resource = settings_resource.add_resource("reminders")
+        reminders_resource.add_method(
+            "PUT",
+            apigw.LambdaIntegration(lambda_stack.update_reminder_settings_lambda),
+            authorization_type=apigw.AuthorizationType.COGNITO,
+            authorizer=self.authorizer,
+        )
+
+        push_resource = settings_resource.add_resource("push-subscription")
+        push_resource.add_method(
+            "POST",
+            apigw.LambdaIntegration(lambda_stack.save_push_subscription_lambda),
+            authorization_type=apigw.AuthorizationType.COGNITO,
+            authorizer=self.authorizer,
+        )
+        push_resource.add_method(
+            "DELETE",
+            apigw.LambdaIntegration(lambda_stack.save_push_subscription_lambda),
+            authorization_type=apigw.AuthorizationType.COGNITO,
+            authorizer=self.authorizer,
+        )
 
         # --- Output ---
         CfnOutput(self, "ApiUrl", value=self.api.url, description="Medorra API Gateway URL")

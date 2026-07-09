@@ -1,4 +1,5 @@
 from aws_cdk import (
+    Duration,
     aws_events as events,
     aws_events_targets as targets,
     aws_lambda as lambda_,
@@ -58,3 +59,12 @@ class EventBridgeStack(Construct):
         )
 
         self.event_bus.grant_put_events_to(lambda_stack.request_account_deletion_lambda)
+
+        self.reminder_schedule_rule = events.Rule(
+            self,
+            "LoggingReminderSchedule",
+            rule_name=f"{prefix}-LoggingReminderSchedule",
+            schedule=events.Schedule.rate(Duration.hours(1)),
+            targets=[targets.LambdaFunction(lambda_stack.send_logging_reminders_lambda)],
+        )
+
