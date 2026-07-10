@@ -483,6 +483,25 @@ class LambdaStack(Construct):
             },
         )
 
+        self.trends_analytics_lambda = lambda_.Function(
+            self, "TrendsAnalyticsLambda",
+            function_name=f"{prefix}TrendsAnalytics",
+            runtime=lambda_.Runtime.PYTHON_3_14,
+            handler="lambda_function.lambda_handler",
+            code=lambda_.Code.from_asset("lambda/Function/TrendsAnalytics"),
+            timeout=Duration.seconds(300),
+            memory_size=256,
+            layers=[powertools_layer, medorra_generic_layer],
+            environment={
+                "USERS_TABLE_NAME": tables["Users"].table_name,
+                "SYMPTOMS_TABLE_NAME": tables["Symptoms"].table_name,
+                "MEDICATIONS_TABLE_NAME": tables["Medications"].table_name,
+                "FOOD_TABLE_NAME": tables["Food"].table_name,
+                "SLEEP_TABLE_NAME": tables["Sleep"].table_name,
+            },
+        )
+
+
         all_lambdas = [
             self.register_lambda,
             self.login_lambda,
@@ -513,7 +532,7 @@ class LambdaStack(Construct):
             self.update_reminder_settings_lambda,
             self.save_push_subscription_lambda,
             self.send_logging_reminders_lambda,
-
+            self.trends_analytics_lambda,
         ]
 
         for table in tables.values():
