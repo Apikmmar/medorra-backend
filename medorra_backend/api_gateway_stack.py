@@ -259,6 +259,41 @@ class ApiGatewayStack(Construct):
             authorizer=self.authorizer,
         )
 
+        voice_resource = self.api.root.add_resource("voice-entries")
+
+        voice_upload_resource = voice_resource.add_resource("upload")
+        voice_upload_resource.add_method(
+            "POST",
+            apigw.LambdaIntegration(lambda_stack.create_voice_upload_lambda),
+            authorization_type=apigw.AuthorizationType.COGNITO,
+            authorizer=self.authorizer,
+        )
+
+        voice_draft_resource = voice_resource.add_resource("{draftId}")
+        voice_draft_resource.add_method(
+            "GET",
+            apigw.LambdaIntegration(lambda_stack.get_voice_draft_lambda),
+            authorization_type=apigw.AuthorizationType.COGNITO,
+            authorizer=self.authorizer,
+        )
+
+        voice_process_resource = voice_draft_resource.add_resource("process")
+        voice_process_resource.add_method(
+            "POST",
+            apigw.LambdaIntegration(lambda_stack.start_voice_transcription_lambda),
+            authorization_type=apigw.AuthorizationType.COGNITO,
+            authorizer=self.authorizer,
+        )
+
+        voice_confirm_resource = voice_draft_resource.add_resource("confirm")
+        voice_confirm_resource.add_method(
+            "POST",
+            apigw.LambdaIntegration(lambda_stack.confirm_voice_draft_lambda),
+            authorization_type=apigw.AuthorizationType.COGNITO,
+            authorizer=self.authorizer,
+        )
+
+
 
         # --- Output ---
         CfnOutput(self, "ApiUrl", value=self.api.url, description="Medorra API Gateway URL")

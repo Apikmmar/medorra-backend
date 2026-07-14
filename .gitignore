@@ -10,3 +10,5 @@ cdk.out
 
 # VAPID keys (web push signing key — do not commit)
 *.pem
+
+ZEntry

@@ -68,3 +68,16 @@ class EventBridgeStack(Construct):
             targets=[targets.LambdaFunction(lambda_stack.send_logging_reminders_lambda)],
         )
 
+        self.transcribe_completion_rule = events.Rule(
+            self,
+            "VoiceTranscribeCompletionRule",
+            rule_name=f"{prefix}-VoiceTranscribeCompletion",
+            event_pattern=events.EventPattern(
+                source=["aws.transcribe"],
+                detail_type=["Transcribe Job State Change"],
+                detail={
+                    "TranscriptionJobStatus": ["COMPLETED", "FAILED"],
+                },
+            ),
+            targets=[targets.LambdaFunction(lambda_stack.extract_voice_entries_lambda)],
+        )

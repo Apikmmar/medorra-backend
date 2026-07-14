@@ -24,8 +24,24 @@ class MedorraBackendStack(Stack):
             block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
             encryption=s3.BucketEncryption.S3_MANAGED,
             removal_policy=RemovalPolicy.RETAIN,
+            cors=[
+                s3.CorsRule(
+                    allowed_methods=[s3.HttpMethods.PUT],
+                    allowed_origins=["*"],
+                    allowed_headers=["*"],
+                    max_age=3000,
+                )
+            ],
             lifecycle_rules=[
                 s3.LifecycleRule(expiration=Duration.days(90)),
+                s3.LifecycleRule(
+                    prefix="voice/",
+                    expiration=Duration.days(1),
+                ),
+                s3.LifecycleRule(
+                    prefix="voice-transcripts/",
+                    expiration=Duration.days(1),
+                )
             ],
         )
 

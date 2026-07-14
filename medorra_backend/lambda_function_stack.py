@@ -501,6 +501,126 @@ class LambdaStack(Construct):
             },
         )
 
+        self.create_voice_upload_lambda = lambda_.Function(
+            self, "CreateVoiceUploadLambda",
+            function_name=f"{prefix}CreateVoiceUpload",
+            runtime=lambda_.Runtime.PYTHON_3_14,
+            handler="lambda_function.lambda_handler",
+            code=lambda_.Code.from_asset("lambda/Function/CreateVoiceUpload"),
+            timeout=Duration.seconds(30),
+            memory_size=128,
+            layers=[powertools_layer, medorra_generic_layer],
+            environment={
+                "VOICE_DRAFTS_TABLE_NAME": tables["VoiceDrafts"].table_name,
+                "VOICE_BUCKET": medorra_s3_bucket.bucket_name,
+                "VOICE_AUDIO_PREFIX": "voice/",
+                "VOICE_TRANSCRIPT_PREFIX": "voice-transcripts/",
+                "TRANSCRIBE_JOB_PREFIX": "medorra_voice_",
+            },
+        )
+
+        self.start_voice_transcription_lambda = lambda_.Function(
+            self, "StartVoiceTranscriptionLambda",
+            function_name=f"{prefix}StartVoiceTranscription",
+            runtime=lambda_.Runtime.PYTHON_3_14,
+            handler="lambda_function.lambda_handler",
+            code=lambda_.Code.from_asset("lambda/Function/StartVoiceTranscription"),
+            timeout=Duration.seconds(30),
+            memory_size=128,
+            layers=[powertools_layer, medorra_generic_layer],
+            environment={
+                "VOICE_DRAFTS_TABLE_NAME": tables["VoiceDrafts"].table_name,
+                "VOICE_BUCKET": medorra_s3_bucket.bucket_name,
+                "VOICE_AUDIO_PREFIX": "voice/",
+                "VOICE_TRANSCRIPT_PREFIX": "voice-transcripts/",
+                "TRANSCRIBE_JOB_PREFIX": "medorra_voice_",
+                "TRANSCRIBE_LANGUAGE": "en-US"
+            },
+        )
+
+        self.extract_voice_entries_lambda = lambda_.Function(
+            self, "ExtractVoiceEntriesLambda",
+            function_name=f"{prefix}ExtractVoiceEntries",
+            runtime=lambda_.Runtime.PYTHON_3_14,
+            handler="lambda_function.lambda_handler",
+            code=lambda_.Code.from_asset("lambda/Function/ExtractVoiceEntries"),
+            timeout=Duration.seconds(120),
+            memory_size=256,
+            layers=[powertools_layer, medorra_generic_layer],
+            environment={
+                "VOICE_DRAFTS_TABLE_NAME": tables["VoiceDrafts"].table_name,
+                "VOICE_BUCKET": medorra_s3_bucket.bucket_name,
+                "VOICE_AUDIO_PREFIX": "voice/",
+                "VOICE_TRANSCRIPT_PREFIX": "voice-transcripts/",
+                "TRANSCRIBE_JOB_PREFIX": "medorra_voice_",
+                "TOKEN_USAGE_TABLE_NAME": tables["TokenUsage"].table_name,
+                "BEDROCK_MODEL_ID": "us.anthropic.claude-sonnet-4-6",
+                "BEDROCK_REGION": "us-west-2",
+            },
+        )
+
+        self.get_voice_draft_lambda = lambda_.Function(
+            self, "GetVoiceDraftLambda",
+            function_name=f"{prefix}GetVoiceDraft",
+            runtime=lambda_.Runtime.PYTHON_3_14,
+            handler="lambda_function.lambda_handler",
+            code=lambda_.Code.from_asset("lambda/Function/GetVoiceDraft"),
+            timeout=Duration.seconds(30),
+            memory_size=128,
+            layers=[powertools_layer, medorra_generic_layer],
+            environment={
+                "VOICE_DRAFTS_TABLE_NAME": tables["VoiceDrafts"].table_name,
+                "VOICE_BUCKET": medorra_s3_bucket.bucket_name,
+                "VOICE_AUDIO_PREFIX": "voice/",
+                "VOICE_TRANSCRIPT_PREFIX": "voice-transcripts/",
+                "TRANSCRIBE_JOB_PREFIX": "medorra_voice_",
+            },
+        )
+
+        self.confirm_voice_draft_lambda = lambda_.Function(
+            self, "ConfirmVoiceDraftLambda",
+            function_name=f"{prefix}ConfirmVoiceDraft",
+            runtime=lambda_.Runtime.PYTHON_3_14,
+            handler="lambda_function.lambda_handler",
+            code=lambda_.Code.from_asset("lambda/Function/ConfirmVoiceDraft"),
+            timeout=Duration.seconds(60),
+            memory_size=256,
+            layers=[powertools_layer, medorra_generic_layer],
+            environment={
+                "VOICE_DRAFTS_TABLE_NAME": tables["VoiceDrafts"].table_name,
+                "VOICE_BUCKET": medorra_s3_bucket.bucket_name,
+                "VOICE_AUDIO_PREFIX": "voice/",
+                "VOICE_TRANSCRIPT_PREFIX": "voice-transcripts/",
+                "TRANSCRIBE_JOB_PREFIX": "medorra_voice_",
+                "SYMPTOMS_TABLE_NAME": tables["Symptoms"].table_name,
+                "MEDICATIONS_TABLE_NAME": tables["Medications"].table_name,
+                "FOOD_TABLE_NAME": tables["Food"].table_name,
+                "SLEEP_TABLE_NAME": tables["Sleep"].table_name,
+            },
+        )
+
+        medorra_s3_bucket.grant_put(self.create_voice_upload_lambda)
+        medorra_s3_bucket.grant_read_write(self.start_voice_transcription_lambda)
+        medorra_s3_bucket.grant_read(self.extract_voice_entries_lambda)
+
+        self.start_voice_transcription_lambda.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["transcribe:StartTranscriptionJob"],
+                resources=["*"],
+            )
+        )
+        self.extract_voice_entries_lambda.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["transcribe:GetTranscriptionJob"],
+                resources=["*"],
+            )
+        )
+        self.extract_voice_entries_lambda.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["bedrock:InvokeModel"],
+                resources=["*"],
+            )
+        )
 
         all_lambdas = [
             self.register_lambda,
@@ -533,6 +653,11 @@ class LambdaStack(Construct):
             self.save_push_subscription_lambda,
             self.send_logging_reminders_lambda,
             self.trends_analytics_lambda,
+            self.create_voice_upload_lambda,
+            self.start_voice_transcription_lambda,
+            self.extract_voice_entries_lambda,
+            self.get_voice_draft_lambda,
+            self.confirm_voice_draft_lambda,
         ]
 
         for table in tables.values():
