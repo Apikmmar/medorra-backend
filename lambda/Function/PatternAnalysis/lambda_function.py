@@ -374,7 +374,7 @@ def synthesizeInsightAudio(userId, insightId, text):
             return None
 
         audioBytes = audioStream.read()
-        key = f"{userId}/{insightId}.mp3"
+        key = f"polly-voice/{userId}/{insightId}.mp3"
 
         s3.put_object(
             Bucket=INSIGHT_BUCKET,
