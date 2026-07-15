@@ -26,6 +26,9 @@ class SleepSegment:
         if end <= start:
             raise ValidationError("endTime", "End time must be after start time")
 
+        if BaseEntry.isFutureTimestamp(self.endTime):
+            raise ValidationError("endTime", "Cannot be in the future")
+
     def calculateDuration(self) -> float:
         start = datetime.fromisoformat(self.startTime.replace('Z', '+00:00'))
         end = datetime.fromisoformat(self.endTime.replace('Z', '+00:00'))

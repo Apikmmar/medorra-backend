@@ -1,6 +1,6 @@
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Optional
 from zoneinfo import ZoneInfo
 
@@ -21,6 +21,7 @@ class BaseEntry:
     version: int = 1
 
     VALID_ENTRY_TYPES = {"symptom", "medication", "food", "sleep"}
+    FUTURE_TOLERANCE_MINUTES = 5
 
     def __post_init__(self):
         now = datetime.now().strftime('%Y-%m-%dT%H:%M:%S.%fZ')
@@ -53,6 +54,9 @@ class BaseEntry:
                 datetime.fromisoformat(self.timestamp.replace('Z', '+00:00'))
             except (ValueError, TypeError):
                 raise ValidationError("timestamp", "Must be a valid ISO 8601 timestamp")
+
+            if self.isFutureTimestamp(self.timestamp):
+                raise ValidationError("timestamp", "Cannot be in the future")
 
         if not isinstance(self.version, int) or self.version < 1:
             raise ValidationError("version", "Must be a positive integer")
@@ -92,6 +96,18 @@ class BaseEntry:
     @staticmethod
     def generateSortKey(createdAt: str, entryId: str) -> str:
         return f"{createdAt}#{entryId}"
+
+    @staticmethod
+    def isFutureTimestamp(iso: Optional[str]) -> bool:
+        try:
+            dt = datetime.fromisoformat(iso.replace('Z', '+00:00'))
+        except (ValueError, TypeError, AttributeError):
+            return False
+
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+
+        return dt > datetime.now(timezone.utc) + timedelta(minutes=BaseEntry.FUTURE_TOLERANCE_MINUTES)
 
     @staticmethod
     def defaultTimestampForTimezone(tzName: Optional[str] = None) -> str:

@@ -1,7 +1,9 @@
 import os
 import json
 import uuid
+import hashlib
 import boto3
+from datetime import datetime, timezone, timedelta
 from botocore.exceptions import ClientError
 from base_entry import BaseEntry, ValidationError
 from symptom_entry import SymptomEntry
@@ -22,6 +24,7 @@ SLEEP_TABLE_NAME = os.environ.get("SLEEP_TABLE_NAME")
 dynamodb = boto3.resource("dynamodb")
 
 VOICE_DRAFTS_TABLE = dynamodb.Table(VOICE_DRAFTS_TABLE_NAME)
+FUTURE_TOLERANCE_MINUTES = 5
 
 logger = Logger()
 tracer = Tracer()
@@ -73,13 +76,20 @@ def lambda_handler(event, context: LambdaContext):
             if model is None:
                 return createResponse(400, f"Invalid entryType at index {idx}", {"field": "entryType"})
 
+            clientEntryId = e.get("clientEntryId") or str(uuid.uuid4())
+
             data = dict(e.get("data", {}))
             data["userId"] = userId
             data["entryType"] = entryType
-            data["entryId"] = e.get("clientEntryId") or str(uuid.uuid4())
+            data["entryId"] = deterministicUuidV4(f"{draftId}:{clientEntryId}")
 
             entry = model.fromDict(data)
             entry.validate()
+            alignEventTime(entry)
+
+            if isFutureTime(entry.timestamp):
+                return createResponse(400, "Entries cannot have a future date/time", {"field": "timestamp"})
+
             prepared.append(entry)
 
         createdIds = []
@@ -116,6 +126,41 @@ def createResponse(statusCode, message, data):
         }, cls=DecimalEncoder),
         'headers': {"Access-Control-Allow-Origin": "*"}
     }
+
+def isFutureTime(iso):
+    try:
+        dt = datetime.fromisoformat(iso.replace("Z", "+00:00"))
+    except (ValueError, TypeError, AttributeError):
+        return False
+
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+
+    now = datetime.now(timezone.utc)
+    return dt > now + timedelta(minutes=FUTURE_TOLERANCE_MINUTES)
+
+@tracer.capture_method
+def alignEventTime(entry):
+    eventTime = None
+
+    if entry.entryType == "sleep":
+        endTimes = [seg.endTime for seg in getattr(entry, "segments", []) if getattr(seg, "endTime", None)]
+        if endTimes:
+            eventTime = max(endTimes)
+    else:
+        eventTime = getattr(entry, "timestamp", None)
+
+    if eventTime:
+        entry.createdAt = eventTime
+        entry.timestamp = eventTime
+
+@tracer.capture_method
+def deterministicUuidV4(seed):
+    digest = hashlib.sha256(seed.encode("utf-8")).digest()
+    b = bytearray(digest[:16])
+    b[6] = (b[6] & 0x0F) | 0x40
+    b[8] = (b[8] & 0x3F) | 0x80
+    return str(uuid.UUID(bytes=bytes(b)))
 
 @tracer.capture_method
 def getDraft(userId, draftId):
