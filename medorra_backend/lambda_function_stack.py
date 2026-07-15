@@ -622,6 +622,23 @@ class LambdaStack(Construct):
             )
         )
 
+        self.search_entries_lambda = lambda_.Function(
+            self, "SearchEntriesLambda",
+            function_name=f"{prefix}SearchEntries",
+            runtime=lambda_.Runtime.PYTHON_3_14,
+            handler="lambda_function.lambda_handler",
+            code=lambda_.Code.from_asset("lambda/Function/SearchEntries"),
+            timeout=Duration.seconds(300),
+            memory_size=128,
+            layers=[powertools_layer, medorra_generic_layer],
+            environment={
+                "SYMPTOMS_TABLE_NAME": tables['Symptoms'].table_name,
+                "MEDICATIONS_TABLE_NAME": tables['Medications'].table_name,
+                "FOOD_TABLE_NAME": tables['Food'].table_name,
+                "SLEEP_TABLE_NAME": tables['Sleep'].table_name,
+            },
+        )
+
         all_lambdas = [
             self.register_lambda,
             self.login_lambda,
@@ -658,6 +675,7 @@ class LambdaStack(Construct):
             self.extract_voice_entries_lambda,
             self.get_voice_draft_lambda,
             self.confirm_voice_draft_lambda,
+            self.search_entries_lambda,
         ]
 
         for table in tables.values():

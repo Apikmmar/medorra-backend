@@ -293,6 +293,13 @@ class ApiGatewayStack(Construct):
             authorizer=self.authorizer,
         )
 
+        search_resource = entries_resource.add_resource("search")
+        search_resource.add_method(
+            "GET",
+            apigw.LambdaIntegration(lambda_stack.search_entries_lambda),
+            authorization_type=apigw.AuthorizationType.COGNITO,
+            authorizer=self.authorizer,
+        )
 
 
         # --- Output ---
