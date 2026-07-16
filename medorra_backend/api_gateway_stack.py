@@ -5,7 +5,10 @@ from aws_cdk import (
 from constructs import Construct
 
 CORS_OPTIONS = apigw.CorsOptions(
-    allow_origins=apigw.Cors.ALL_ORIGINS,
+    allow_origins=[
+        "http://localhost:3005",
+        # "<domain>",
+    ],
     allow_methods=apigw.Cors.ALL_METHODS,
     allow_headers=[
         "Content-Type",
