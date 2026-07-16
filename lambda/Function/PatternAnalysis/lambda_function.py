@@ -38,6 +38,7 @@ FOOD_TABLE = dynamodb.Table(FOOD_TABLE_NAME)
 SLEEP_TABLE = dynamodb.Table(SLEEP_TABLE_NAME)
 INSIGHTS_TABLE = dynamodb.Table(INSIGHTS_TABLE_NAME)
 TOKEN_USAGE_TABLE = dynamodb.Table(TOKEN_USAGE_TABLE_NAME) if TOKEN_USAGE_TABLE_NAME else None
+ANALYSIS_LOOKBACK_DAYS = int(os.environ.get("ANALYSIS_LOOKBACK_DAYS"))
 
 TABLE_MAP = {
     "symptom": SYMPTOMS_TABLE,
@@ -50,6 +51,7 @@ MINIMUM_LOGGING_DAYS = 14
 DEFAULT_TIME_WINDOW = 3
 MIN_CONFIDENCE = 0.6
 MAX_INSIGHTS = 20
+GSI_TIMESTAMP = "gsi-timestamp"
 
 logger = Logger()
 tracer = Tracer()
@@ -75,7 +77,7 @@ def lambda_handler(event, context: LambdaContext):
             return createResponse(200, f"Threshold not met. {remainingDays} more days needed.", {"remainingDays": remainingDays})
 
         timeWindow = getTimeWindow(userConfig)
-        entries = fetchAllEntries(userId, timeWindow)
+        entries = fetchAllEntries(userId, ANALYSIS_LOOKBACK_DAYS)
 
         if not entries:
             return createResponse(200, "No entries in time window", None)
@@ -124,8 +126,8 @@ def getTimeWindow(userConfig):
     return userConfig.get("timeWindow", DEFAULT_TIME_WINDOW)
 
 @tracer.capture_method
-def fetchAllEntries(userId, timeWindow):
-    cutoffDate = (datetime.utcnow() - timedelta(days=int(timeWindow))).strftime('%Y-%m-%dT%H:%M:%S')
+def fetchAllEntries(userId, lookbackDays):
+    cutoffDate = (datetime.utcnow() - timedelta(days=int(lookbackDays))).strftime('%Y-%m-%dT%H:%M:%S')
 
     allEntries = {}
 
@@ -148,7 +150,8 @@ def queryTableSinceDate(table, userId, cutoffDate, entryType):
 
     while True:
         queryKwargs = {
-            "KeyConditionExpression": Key("userId").eq(userId) & Key("createdAt#entryId").gte(cutoffDate),
+            "IndexName": GSI_TIMESTAMP,
+            "KeyConditionExpression": Key("userId").eq(userId) & Key("timestamp").gte(cutoffDate),
             "ScanIndexForward": False,
         }
         if lastKey:
@@ -217,15 +220,15 @@ def formatEntries(entries, entryType):
 
     for entry in entries:
         if entryType == "symptom":
-            lines.append(f"[{entry.get('createdAt', '')}] entryId={entry.get('entryId', '')} symptom={entry.get('symptomName', '')} severity={entry.get('severity', '')}")
+            lines.append(f"[{entry.get('timestamp', '')}] entryId={entry.get('entryId', '')} symptom={entry.get('symptomName', '')} severity={entry.get('severity', '')}")
         elif entryType == "medication":
-            lines.append(f"[{entry.get('createdAt', '')}] entryId={entry.get('entryId', '')} medication={entry.get('medicationName', '')} dosage={entry.get('dosageAmount', 'unspecified')}{entry.get('dosageUnit', '')}")
+            lines.append(f"[{entry.get('timestamp', '')}] entryId={entry.get('entryId', '')} medication={entry.get('medicationName', '')} dosage={entry.get('dosageAmount', 'unspecified')}{entry.get('dosageUnit', '')}")
         elif entryType == "food":
             items = entry.get("items", [])
             descriptions = [item.get("description", "") for item in items if isinstance(item, dict)]
-            lines.append(f"[{entry.get('createdAt', '')}] entryId={entry.get('entryId', '')} meal={entry.get('mealType', '')} items={', '.join(descriptions)}")
+            lines.append(f"[{entry.get('timestamp', '')}] entryId={entry.get('entryId', '')} meal={entry.get('mealType', '')} items={', '.join(descriptions)}")
         elif entryType == "sleep":
-            lines.append(f"[{entry.get('createdAt', '')}] entryId={entry.get('entryId', '')} duration={entry.get('totalDuration', 0)}min quality={entry.get('qualityRating', '')}")
+            lines.append(f"[{entry.get('timestamp', '')}] entryId={entry.get('entryId', '')} duration={entry.get('totalDuration', 0)}min quality={entry.get('qualityRating', '')}")
 
     return "\n".join(lines)
 

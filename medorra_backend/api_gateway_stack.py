@@ -34,6 +34,20 @@ class ApiGatewayStack(Construct):
             endpoint_configuration=apigw.EndpointConfiguration(
                 types=[apigw.EndpointType.EDGE],
             ),
+            deploy_options=apigw.StageOptions(
+                throttling_rate_limit=25,
+                throttling_burst_limit=50,
+                method_options={
+                    "/voice-entries/upload/POST": apigw.MethodDeploymentOptions(
+                        throttling_rate_limit=2,
+                        throttling_burst_limit=5,
+                    ),
+                    "/voice-entries/{draftId}/process/POST": apigw.MethodDeploymentOptions(
+                        throttling_rate_limit=2,
+                        throttling_burst_limit=5,
+                    ),
+                }
+            )
         )
 
         self.authorizer = apigw.CognitoUserPoolsAuthorizer(

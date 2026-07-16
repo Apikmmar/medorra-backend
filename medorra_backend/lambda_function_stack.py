@@ -309,7 +309,8 @@ class LambdaStack(Construct):
                 "BEDROCK_REGION": 'us-west-2',
                 "INSIGHT_BUCKET": medorra_s3_bucket.bucket_name,
                 "POLLY_VOICE_ID": "Joanna",
-                "POLLY_ENGINE": "neural"
+                "POLLY_ENGINE": "neural",
+                "ANALYSIS_LOOKBACK_DAYS": "90"
             },
         )
 

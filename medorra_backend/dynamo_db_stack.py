@@ -71,3 +71,11 @@ class DynamoDBStack(Construct):
                     index_name='gsi-reminders',
                     projection_type=dynamodb.ProjectionType.ALL,
                 )
+
+            if table in stream_tables:
+                ddb_table.add_global_secondary_index(
+                    partition_key=dynamodb.Attribute(name='userId', type=dynamodb.AttributeType.STRING),
+                    sort_key=dynamodb.Attribute(name='timestamp', type=dynamodb.AttributeType.STRING),
+                    index_name='gsi-timestamp',
+                    projection_type=dynamodb.ProjectionType.ALL,
+                )
