@@ -7,7 +7,8 @@ from constructs import Construct
 CORS_OPTIONS = apigw.CorsOptions(
     allow_origins=[
         "http://localhost:3005",
-        # "<domain>",
+        "https://medorra-frontend.vercel.app",
+        "https://medorra-frontend-aafiqs-projects.vercel.app",
     ],
     allow_methods=apigw.Cors.ALL_METHODS,
     allow_headers=[
