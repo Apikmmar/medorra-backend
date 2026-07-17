@@ -315,6 +315,8 @@ class LambdaStack(Construct):
                 "INSIGHT_BUCKET": medorra_s3_bucket.bucket_name,
                 "POLLY_VOICE_ID": "Joanna",
                 "POLLY_ENGINE": "neural",
+                "SENDER_EMAIL": "noreply@medorra.com",
+                "APP_URL": "https://medorra-frontend.vercel.app",
             },
         )
 
@@ -328,6 +330,13 @@ class LambdaStack(Construct):
         self.pattern_analysis_lambda.add_to_role_policy(
             iam.PolicyStatement(
                 actions=["polly:SynthesizeSpeech"],
+                resources=["*"]
+            )
+        )
+
+        self.pattern_analysis_lambda.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["ses:SendEmail"],
                 resources=["*"]
             )
         )

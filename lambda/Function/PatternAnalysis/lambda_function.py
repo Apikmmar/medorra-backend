@@ -7,6 +7,7 @@ from boto3.dynamodb.conditions import Key
 from botocore.exceptions import ClientError
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 from dynamo_retry import dynamoRetry
 from json_encoder import DecimalEncoder
 from user_isolation import enforceUserIsolation
@@ -26,11 +27,14 @@ BEDROCK_REGION = os.environ.get("BEDROCK_REGION")
 INSIGHT_BUCKET = os.environ.get("INSIGHT_BUCKET")
 POLLY_VOICE_ID = os.environ.get("POLLY_VOICE_ID")
 POLLY_ENGINE = os.environ.get("POLLY_ENGINE")
+SENDER_EMAIL = os.environ.get("SENDER_EMAIL")
+APP_URL = os.environ.get("APP_URL")
 
 dynamodb = boto3.resource("dynamodb")
 bedrock = boto3.client("bedrock-runtime", region_name=BEDROCK_REGION)
 polly = boto3.client("polly", region_name=BEDROCK_REGION)
 s3 = boto3.client("s3")
+ses = boto3.client("ses")
 
 USERS_TABLE = dynamodb.Table(USERS_TABLE_NAME)
 SYMPTOMS_TABLE = dynamodb.Table(SYMPTOMS_TABLE_NAME)
@@ -89,7 +93,9 @@ def lambda_handler(event, context: LambdaContext):
         validInsights.sort(key=lambda x: x.get("confidenceScore", 0), reverse=True)
         validInsights = validInsights[:MAX_INSIGHTS]
 
-        storeInsights(userId, validInsights)
+        changed = storeInsights(userId, validInsights)
+
+        notifyInsightsGenerated(userConfig, validInsights, changed)
 
         return createResponse(200, "Analysis complete", {"insightsCount": len(validInsights)})
 
@@ -271,6 +277,12 @@ def storeInsights(userId, insights):
 
     existingInsights = getExistingInsights(userId)
 
+    oldSignatures = {
+        insightSignature(e.get("trigger"), e.get("correlatedSymptom"))
+        for e in existingInsights
+        if e.get("status") == "active"
+    }
+
     for existing in existingInsights:
         if existing.get("status") == "active":
             deleteInsights(userId, existing)
@@ -306,9 +318,80 @@ def storeInsights(userId, insights):
             payload["audioKey"] = audioKey
 
         dynamoRetry(
-            INSIGHTS_TABLE.put_item, 
+            INSIGHTS_TABLE.put_item,
             Item=payload
         )
+
+    newSignatures = {
+        insightSignature(i.get("trigger"), i.get("correlatedSymptom"))
+        for i in insights
+    }
+
+    return newSignatures != oldSignatures
+
+@tracer.capture_method
+def insightSignature(trigger, correlatedSymptom):
+    trigger = trigger if isinstance(trigger, dict) else {}
+    entryType = str(trigger.get("entryType", "")).strip().lower()
+    identifier = str(trigger.get("identifier", "")).strip().lower()
+    symptom = str(correlatedSymptom or "").strip().lower()
+    return f"{entryType}:{identifier}->{symptom}"
+
+@tracer.capture_method
+def notifyInsightsGenerated(userConfig, insights, changed):
+    if not insights or not changed:
+        return
+
+    email = userConfig.get("email")
+    if not email or not SENDER_EMAIL:
+        logger.info({"message": "No email/sender configured; skipping insight notification"})
+        return
+
+    userTimezone = userConfig.get("timezone", "UTC")
+    try:
+        todayLocal = datetime.now(ZoneInfo(userTimezone)).strftime("%Y-%m-%d")
+    except Exception:
+        todayLocal = datetime.utcnow().strftime("%Y-%m-%d")
+
+    if userConfig.get("lastInsightNotifiedDate") == todayLocal:
+        return
+
+    try:
+        sendInsightEmail(email, insights)
+
+        dynamoRetry(
+            USERS_TABLE.update_item,
+            Key={"userId": userConfig["userId"]},
+            UpdateExpression="SET lastInsightNotifiedDate = :d",
+            ExpressionAttributeValues={":d": todayLocal},
+        )
+    except Exception as e:
+        logger.warning({"message": "Failed to send insight notification", "error": str(e)})
+
+@tracer.capture_method
+def sendInsightEmail(email, insights):
+    count = len(insights)
+    plural = "s" if count != 1 else ""
+    summaries = [i.get("summary", "").strip() for i in insights[:3] if i.get("summary")]
+    bullets = "\n".join(f"- {s}" for s in summaries)
+
+    bodyText = (
+        f"Medorra analyzed your recent entries and found {count} new "
+        f"pattern{plural} in your health data.\n\n"
+        f"{bullets}\n\n"
+        f"See all your insights: {APP_URL}/insights\n\n"
+        "These insights are observational patterns and not medical diagnoses.\n\n"
+        "— Medorra"
+    )
+
+    ses.send_email(
+        Source=SENDER_EMAIL,
+        Destination={"ToAddresses": [email]},
+        Message={
+            "Subject": {"Data": f"Medorra found {count} new health insight{plural}"},
+            "Body": {"Text": {"Data": bodyText}},
+        },
+    )
 
 @tracer.capture_method
 def deleteInsights(userId, existing):
