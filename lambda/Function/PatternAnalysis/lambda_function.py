@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import uuid
 import boto3
@@ -38,7 +39,6 @@ FOOD_TABLE = dynamodb.Table(FOOD_TABLE_NAME)
 SLEEP_TABLE = dynamodb.Table(SLEEP_TABLE_NAME)
 INSIGHTS_TABLE = dynamodb.Table(INSIGHTS_TABLE_NAME)
 TOKEN_USAGE_TABLE = dynamodb.Table(TOKEN_USAGE_TABLE_NAME) if TOKEN_USAGE_TABLE_NAME else None
-ANALYSIS_LOOKBACK_DAYS = int(os.environ.get("ANALYSIS_LOOKBACK_DAYS"))
 
 TABLE_MAP = {
     "symptom": SYMPTOMS_TABLE,
@@ -77,7 +77,7 @@ def lambda_handler(event, context: LambdaContext):
             return createResponse(200, f"Threshold not met. {remainingDays} more days needed.", {"remainingDays": remainingDays})
 
         timeWindow = getTimeWindow(userConfig)
-        entries = fetchAllEntries(userId, ANALYSIS_LOOKBACK_DAYS)
+        entries = fetchAllEntries(userId, timeWindow)
 
         if not entries:
             return createResponse(200, "No entries in time window", None)
@@ -234,24 +234,36 @@ def formatEntries(entries, entryType):
 
 @tracer.capture_method
 def parseBedrockResponse(responseText):
+    text = (responseText or "").strip()
+
+    if text.startswith("```"):
+        fence = re.match(r"^```[a-zA-Z]*\n(.*)\n```$", text, re.DOTALL)
+        if fence:
+            text = fence.group(1).strip()
+
+    def loadList(candidate):
+        parsed = json.loads(candidate)
+        if not isinstance(parsed, list):
+            raise ValueError("Bedrock response is not a JSON array")
+        return parsed
+
     try:
-        text = responseText.strip()
+        return loadList(text)
+    except (json.JSONDecodeError, ValueError):
 
-        if text.startswith("```"):
-            lines = text.split("\n")
-            text = "\n".join(lines[1:-1])
+        match = re.search(r"\[.*\]", text, re.DOTALL)
+        if match:
+            try:
+                return loadList(match.group(0))
+            except (json.JSONDecodeError, ValueError):
+                pass
 
-        insights = json.loads(text)
-
-        if not isinstance(insights, list):
-            logger.warning({"message": "Bedrock response is not a list"})
-            return []
-
-        return insights
-
-    except (json.JSONDecodeError, ValueError) as e:
-        logger.warning({"message": "Failed to parse Bedrock response", "error": str(e)})
-        return []
+    logger.warning({
+        "message": "Failed to parse Bedrock response",
+        "rawResponse": text[:1000],
+        "rawLength": len(text),
+    })
+    return []
 
 @tracer.capture_method
 def storeInsights(userId, insights):

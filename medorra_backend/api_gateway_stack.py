@@ -8,7 +8,6 @@ CORS_OPTIONS = apigw.CorsOptions(
     allow_origins=[
         "http://localhost:3005",
         "https://medorra-frontend.vercel.app",
-        "https://medorra-frontend-aafiqs-projects.vercel.app",
     ],
     allow_methods=apigw.Cors.ALL_METHODS,
     allow_headers=[
@@ -62,12 +61,6 @@ class ApiGatewayStack(Construct):
         # --- Public endpoints (no authorization required) ---
         auth_resource = self.api.root.add_resource("auth")
 
-        register_resource = auth_resource.add_resource("register")
-        register_resource.add_method(
-            "POST",
-            apigw.LambdaIntegration(lambda_stack.register_lambda),
-            authorization_type=apigw.AuthorizationType.NONE,
-        )
 
         login_resource = auth_resource.add_resource("login")
         login_resource.add_method(

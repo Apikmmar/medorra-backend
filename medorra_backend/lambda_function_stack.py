@@ -2,6 +2,7 @@ from aws_cdk import (
     Duration,
     aws_lambda as lambda_,
     aws_iam as iam,
+    aws_cognito as cognito,
 )
 from constructs import Construct
 from .lambda_layers_stack import create_layers
@@ -14,19 +15,23 @@ class LambdaStack(Construct):
         powertools_layer, medorra_generic_layer, medorra_pywebpush_layer = create_layers(self)
         tables = dynamo_db_stack.tables
 
-        self.register_lambda = lambda_.Function(
-            self, "RegisterLambda",
-            function_name=f"{prefix}Register",
+        self.post_confirmation_lambda = lambda_.Function(
+            self, "PostConfirmationLambda",
+            function_name=f"{prefix}PostConfirmation",
             runtime=lambda_.Runtime.PYTHON_3_14,
             handler="lambda_function.lambda_handler",
-            code=lambda_.Code.from_asset("lambda/Function/Register"),
-            timeout=Duration.seconds(300),
+            code=lambda_.Code.from_asset("lambda/Function/PostConfirmation"),
+            timeout=Duration.seconds(30),
             memory_size=128,
             layers=[powertools_layer, medorra_generic_layer],
             environment={
-                "USER_POOL_ID": cognito_stack.user_pool.user_pool_id,
-                "USER_POOL_CLIENT_ID": cognito_stack.user_pool_client.user_pool_client_id, 
+                "USERS_TABLE_NAME": tables['Users'].table_name,
             },
+        )
+
+        cognito_stack.user_pool.add_trigger(
+            cognito.UserPoolOperation.POST_CONFIRMATION,
+            self.post_confirmation_lambda,
         )
 
         self.login_lambda = lambda_.Function(
@@ -310,7 +315,6 @@ class LambdaStack(Construct):
                 "INSIGHT_BUCKET": medorra_s3_bucket.bucket_name,
                 "POLLY_VOICE_ID": "Joanna",
                 "POLLY_ENGINE": "neural",
-                "ANALYSIS_LOOKBACK_DAYS": "90"
             },
         )
 
@@ -655,7 +659,7 @@ class LambdaStack(Construct):
         )
 
         all_lambdas = [
-            self.register_lambda,
+            self.post_confirmation_lambda,
             self.login_lambda,
             self.refresh_token_lambda,
             self.create_symptom_entry_lambda,
