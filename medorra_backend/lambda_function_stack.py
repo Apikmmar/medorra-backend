@@ -640,6 +640,20 @@ class LambdaStack(Construct):
             },
         )
 
+        self.create_feedback_lambda = lambda_.Function(
+            self, "CreateFeedbackLambda",
+            function_name=f"{prefix}CreateFeedback",
+            runtime=lambda_.Runtime.PYTHON_3_14,
+            handler="lambda_function.lambda_handler",
+            code=lambda_.Code.from_asset("lambda/Function/CreateFeedback"),
+            timeout=Duration.seconds(30),
+            memory_size=128,
+            layers=[powertools_layer, medorra_generic_layer],
+            environment={
+                "FEEDBACK_TABLE_NAME": tables['Feedbacks'].table_name,
+            },
+        )
+
         all_lambdas = [
             self.register_lambda,
             self.login_lambda,
@@ -677,6 +691,7 @@ class LambdaStack(Construct):
             self.get_voice_draft_lambda,
             self.confirm_voice_draft_lambda,
             self.search_entries_lambda,
+            self.create_feedback_lambda,
         ]
 
         for table in tables.values():

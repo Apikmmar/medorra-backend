@@ -17,7 +17,12 @@ class DynamoDBStack(Construct):
             'Insights',
             'TokenUsage',
             'VoiceDrafts',
+            'Feedbacks'
         ]
+
+        partition_keys = {
+            'Feedbacks': 'feedbackId',
+        }
 
         sort_keys = {
             'Symptoms': 'createdAt#entryId',
@@ -34,7 +39,7 @@ class DynamoDBStack(Construct):
         self.tables = {}
 
         for table in tableList:
-            partition_key = 'userId'
+            partition_key = partition_keys.get(table, 'userId')
 
             table_kwargs = {
                 'table_name': f"{prefix}{table}",
